@@ -290,27 +290,19 @@
 
     <!-- UI Overlay: Bottom Sheet for Places -->
     <div
-      class="absolute bottom-0 left-0 right-0 bg-white rounded-t-[2.5rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] z-20 h-[60vh] min-h-[60vh] max-h-[60vh] flex flex-col border-t border-gray-100"
+      class="absolute bottom-0 left-0 right-0 bg-white rounded-t-[2.5rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] z-20 h-[60vh] min-h-[60vh] max-h-[60vh] flex flex-col border-t border-gray-100 transition-all duration-500 ease-in-out"
       :class="{
         'translate-y-full opacity-0': isPlayingGuide || showFavorites,
-        'transition-all duration-500 ease-in-out': !isDragging,
-        'translate-y-[calc(60vh-80px)]':
-          !isDragging && isSheetCollapsed && !isPlayingGuide && !showFavorites,
+        'translate-y-[42.5vh]':
+          isSheetCollapsed && !isPlayingGuide && !showFavorites,
         'translate-y-0':
-          !isDragging && !isSheetCollapsed && !isPlayingGuide && !showFavorites,
+          !isSheetCollapsed && !isPlayingGuide && !showFavorites,
       }"
-      :style="
-        isDragging && !isPlayingGuide && !showFavorites
-          ? { transform: `translateY(${dragY}px)` }
-          : {}
-      "
     >
-      <!-- Clickable Handle to Expand/Collapse & Drag -->
+      <!-- Clickable Handle to Expand/Collapse -->
       <div
-        class="w-full pt-4 pb-2 flex-shrink-0 cursor-grab active:cursor-grabbing touch-none"
-        @mousedown="onDragStart"
-        @touchstart="onDragStart"
-        @click="!isDragging && (isSheetCollapsed = !isSheetCollapsed)"
+        class="w-full pt-4 pb-2 flex-shrink-0 cursor-pointer touch-none"
+        @click="isSheetCollapsed = !isSheetCollapsed"
       >
         <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto"></div>
       </div>
@@ -1202,69 +1194,6 @@ const isFetchingPlaces = ref(false);
 const showFavorites = ref(false);
 const isSheetCollapsed = ref(false);
 
-// Dragging Logic for Bottom Sheet
-const isDragging = ref(false);
-const dragY = ref(0);
-const startTouchY = ref(0);
-const startSheetY = ref(0);
-
-const onDragStart = (e: TouchEvent | MouseEvent) => {
-  if (isPlayingGuide.value || showFavorites.value) return;
-  isDragging.value = true;
-  const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
-  startTouchY.value = clientY;
-
-  // Calculate current Y based on collapsed state
-  const sheetHeight = window.innerHeight * 0.6;
-  const collapsedY = sheetHeight - 80;
-  startSheetY.value = isSheetCollapsed.value ? collapsedY : 0;
-  dragY.value = startSheetY.value;
-
-  window.addEventListener("touchmove", onDragMove, { passive: false });
-  window.addEventListener("touchend", onDragEnd);
-  window.addEventListener("mousemove", onDragMove);
-  window.addEventListener("mouseup", onDragEnd);
-};
-
-const onDragMove = (e: TouchEvent | MouseEvent) => {
-  if (!isDragging.value) return;
-  const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
-  const delta = clientY - startTouchY.value;
-  let newY = startSheetY.value + delta;
-
-  // Constrain
-  const sheetHeight = window.innerHeight * 0.6;
-  const maxY = sheetHeight - 80;
-  if (newY < 0) newY = 0;
-  if (newY > maxY) newY = maxY;
-
-  dragY.value = newY;
-  if ("touches" in e) e.preventDefault(); // Prevent scroll while dragging
-};
-
-const onDragEnd = () => {
-  if (!isDragging.value) return;
-
-  isDragging.value = false;
-
-  const sheetHeight = window.innerHeight * 0.6;
-  const expandedTopY = window.innerHeight - sheetHeight;
-  const screenMidpoint = window.innerHeight / 2;
-
-  // currentTopY is the pixel position of the sheet's top edge relative to the screen top
-  const currentTopY = expandedTopY + dragY.value;
-
-  if (currentTopY > screenMidpoint) {
-    isSheetCollapsed.value = true;
-  } else {
-    isSheetCollapsed.value = false;
-  }
-
-  window.removeEventListener("touchmove", onDragMove);
-  window.removeEventListener("touchend", onDragEnd);
-  window.removeEventListener("mousemove", onDragMove);
-  window.removeEventListener("mouseup", onDragEnd);
-};
 const currentRadius = ref(500);
 const currentCategory = ref("all");
 const categories = [
