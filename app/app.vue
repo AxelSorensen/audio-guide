@@ -1,6 +1,6 @@
 <template>
   <div
-    class="h-screen w-screen relative overflow-hidden bg-gray-100 flex flex-col font-sans"
+    class="h-[100svh] w-screen relative overflow-hidden bg-gray-100 flex flex-col font-sans"
   >
     <!-- Map Container with vue3-google-map -->
     <ClientOnly>
@@ -290,7 +290,7 @@
 
     <!-- UI Overlay: Bottom Sheet for Places -->
     <div
-      class="absolute bottom-0 left-0 right-0 bg-white shadow-[0_-8px_30px_rgba(0,0,0,0.12)] z-20 h-screen flex flex-col border-t border-gray-100 will-change-transform"
+      class="absolute bottom-0 left-0 right-0 bg-white shadow-[0_-8px_30px_rgba(0,0,0,0.12)] z-20 h-[100svh] flex flex-col border-t border-gray-100 will-change-transform"
       :class="{
         'translate-y-full opacity-0': isPlayingGuide || showFavorites,
         'rounded-t-[2.5rem] overflow-hidden': currentSnapState !== 'full',
@@ -810,6 +810,7 @@
 
         <!-- Script Preview -->
         <div
+          ref="scriptScrollContainer"
           class="flex-1 w-full bg-gray-50 rounded-[2.5rem] p-8 text-left shadow-inner border border-gray-100 overflow-y-auto relative min-h-0 no-scrollbar text-left"
         >
           <div
@@ -1495,6 +1496,7 @@ const audioUrl = ref("");
 const isAudioPlaying = ref(false);
 const audioProgress = ref(0);
 const audioPlayer = ref<HTMLAudioElement | null>(null);
+const scriptScrollContainer = ref<HTMLElement | null>(null);
 
 // Loading State Messages
 const loadingMessages = [
@@ -1733,6 +1735,15 @@ const generateGuide = async (place: any, isDeepDive = false, force = false) => {
 
   if (isDeepDive) {
     isGeneratingExtra.value = true;
+    // Scroll to show pending state
+    nextTick(() => {
+      if (scriptScrollContainer.value) {
+        scriptScrollContainer.value.scrollTo({
+          top: scriptScrollContainer.value.scrollHeight,
+          behavior: "smooth",
+        });
+      }
+    });
   } else {
     isGenerating.value = true;
     startLoadingMessages();
@@ -1865,7 +1876,7 @@ body {
   overscroll-behavior: none;
   position: fixed;
   width: 100%;
-  height: 100%;
+  height: 100svh;
 }
 .animate-in {
   animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
