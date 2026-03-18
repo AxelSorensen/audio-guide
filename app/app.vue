@@ -592,7 +592,7 @@
     <!-- UI Overlay: Player View -->
     <div
       v-if="isPlayingGuide"
-      class="absolute inset-0 bg-white z-30 flex flex-col p-8 animate-in text-left text-gray-900"
+      class="absolute inset-0 bg-white z-30 flex flex-col p-8 animate-in text-left text-gray-900 overflow-hidden"
     >
       <div class="flex items-center justify-between mb-6 space-x-4">
         <!-- Subtle Compact Audio Bar -->
@@ -701,86 +701,92 @@
             >
               {{ selectedPlace?.name }}
             </h2>
-            <div class="flex items-center space-x-2 shrink-0 pt-1 relative">
-              <!-- Floating Heart Animation (Burst) -->
-              <div
-                v-if="showFloatingHeart"
-                class="absolute -top-12 left-1/2 -translate-x-1/2 pointer-events-none z-50 w-12 h-12"
-              >
+            <div class="flex items-center space-x-2 shrink-0 pt-1">
+              <!-- Favorite & Rerun Wrapper -->
+              <div class="relative flex items-center">
+                <!-- Floating Heart Animation (Burst) - Moved outside space-x flow -->
                 <div
-                  class="absolute animate-float-up text-xl"
-                  style="left: -12px; animation-delay: 0s"
+                  v-if="showFloatingHeart"
+                  class="absolute -top-12 left-0 pointer-events-none z-50 w-12 h-12"
                 >
-                  ❤️
+                  <div
+                    class="absolute animate-float-up text-xl"
+                    style="left: -12px; animation-delay: 0s"
+                  >
+                    ❤️
+                  </div>
+                  <div
+                    class="absolute animate-float-up text-2xl"
+                    style="left: 0px; animation-delay: 0.15s; margin-top: -8px"
+                  >
+                    ❤️
+                  </div>
+                  <div
+                    class="absolute animate-float-up text-xl"
+                    style="left: 12px; animation-delay: 0.3s"
+                  >
+                    ❤️
+                  </div>
                 </div>
-                <div
-                  class="absolute animate-float-up text-2xl"
-                  style="left: 0px; animation-delay: 0.15s; margin-top: -8px"
-                >
-                  ❤️
-                </div>
-                <div
-                  class="absolute animate-float-up text-xl"
-                  style="left: 12px; animation-delay: 0.3s"
-                >
-                  ❤️
+
+                <!-- Inner Flex for Buttons to maintain spacing -->
+                <div class="flex items-center space-x-2">
+                  <!-- Favorite Button -->
+                  <button
+                    @click="toggleFavorite(selectedPlace)"
+                    class="p-2.5 bg-gray-50 text-indigo-600 rounded-xl hover:bg-indigo-50 transition-colors active:scale-95 group"
+                    title="Favorite"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      :fill="
+                        isFavorite(selectedPlace?.id) ? 'currentColor' : 'none'
+                      "
+                      stroke="currentColor"
+                      stroke-width="2.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      class="group-active:scale-125 transition-transform"
+                    >
+                      <path
+                        d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"
+                      />
+                    </svg>
+                  </button>
+
+                  <!-- Rerun Button -->
+                  <button
+                    v-if="generatedScript && !isGenerating"
+                    @click="generateGuide(selectedPlace, !!generatedExtra, true)"
+                    class="p-2.5 bg-gray-50 text-gray-400 rounded-xl hover:bg-gray-100 hover:text-gray-600 transition-all active:scale-95"
+                    title="Regenerate Research"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path
+                        d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"
+                      />
+                      <path d="M3 3v5h5" />
+                      <path
+                        d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"
+                      />
+                      <path d="M16 16h5v5" />
+                    </svg>
+                  </button>
                 </div>
               </div>
-
-              <!-- Favorite Button -->
-              <button
-                @click="toggleFavorite(selectedPlace)"
-                class="p-2.5 bg-gray-50 text-indigo-600 rounded-xl hover:bg-indigo-50 transition-colors active:scale-95 group"
-                title="Favorite"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  :fill="
-                    isFavorite(selectedPlace?.id) ? 'currentColor' : 'none'
-                  "
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="group-active:scale-125 transition-transform"
-                >
-                  <path
-                    d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"
-                  />
-                </svg>
-              </button>
-
-              <!-- Rerun Button -->
-              <button
-                v-if="generatedScript && !isGenerating"
-                @click="generateGuide(selectedPlace, !!generatedExtra, true)"
-                class="p-2.5 bg-gray-50 text-gray-400 rounded-xl hover:bg-gray-100 hover:text-gray-600 transition-all active:scale-95"
-                title="Regenerate Research"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path
-                    d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"
-                  />
-                  <path d="M3 3v5h5" />
-                  <path
-                    d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"
-                  />
-                  <path d="M16 16h5v5" />
-                </svg>
-              </button>
             </div>
           </div>
           <p class="text-sm font-bold text-indigo-600 mb-4 text-left">
@@ -856,6 +862,12 @@
                   </p>
                 </div>
               </transition>
+              <button
+                @click="cancelGeneration"
+                class="mt-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-red-500 transition-colors"
+              >
+                Cancel Search
+              </button>
             </div>
           </div>
           <div v-else class="animate-in delay-150 text-left text-gray-900">
@@ -932,10 +944,41 @@
                 </button>
               </div>
               <p
-                class="text-gray-800 leading-relaxed text-xl font-medium selection:bg-indigo-100 text-left"
+                class="text-gray-800 leading-relaxed text-lg font-medium selection:bg-indigo-100 text-left"
               >
                 {{ generatedScript || "No specific historical records found." }}
               </p>
+            </div>
+
+            <!-- Tell Me More (Contextual Action) -->
+            <div
+              v-if="
+                !generatedExtra &&
+                !isGenerating &&
+                !isGeneratingExtra &&
+                generatedScript
+              "
+              class="mb-8 animate-in"
+            >
+              <button
+                @click="generateGuide(selectedPlace, true)"
+                class="w-full bg-indigo-50 text-indigo-600 py-2.5 rounded-2xl font-bold text-sm border border-indigo-100 hover:bg-indigo-100 active:scale-95 transition-all flex items-center justify-center space-x-2 shadow-sm"
+              >
+                <span>Tell me more</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
             </div>
 
             <!-- Deep Dive Loading State -->
@@ -943,15 +986,23 @@
               v-if="isGeneratingExtra"
               class="mt-8 pt-8 border-t border-gray-100 animate-in space-y-4"
             >
-              <div class="flex items-center space-x-3">
-                <div
-                  class="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"
-                ></div>
-                <p
-                  class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400"
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                  <div
+                    class="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"
+                  ></div>
+                  <p
+                    class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400"
+                  >
+                    Uncovering deeper layers...
+                  </p>
+                </div>
+                <button
+                  @click="cancelGeneration"
+                  class="text-[9px] font-black uppercase tracking-[0.1em] text-gray-400 hover:text-red-500 transition-colors"
                 >
-                  Uncovering deeper layers...
-                </p>
+                  Cancel
+                </button>
               </div>
               <div class="space-y-2">
                 <div
@@ -1053,126 +1104,99 @@
 
       <!-- Action Footer -->
       <div class="mt-8 space-y-4">
-        <!-- Tell Me More (Primary Action) -->
-        <div
-          v-if="
-            !generatedExtra &&
-            !isGenerating &&
-            !isGeneratingExtra &&
-            generatedScript
-          "
-          class="animate-in"
-        >
-          <button
-            @click="generateGuide(selectedPlace, true)"
-            class="w-full bg-indigo-600 text-white py-5 rounded-[2rem] font-black text-lg shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center space-x-3"
-          >
-            <span>Tell me more</span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="3"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </button>
-        </div>
-
         <!-- Feedback Buttons -->
         <div
           v-if="generatedScript && !isGenerating"
-          class="flex space-x-3 animate-in delay-300 relative"
+          class="flex space-x-3 animate-in delay-300"
         >
-          <!-- Floating Feedback Animation (relative to this container) -->
-          <div
-            v-if="showFloatingFeedback"
-            class="absolute -top-16 left-1/2 -translate-x-1/2 pointer-events-none z-50 animate-float-up text-4xl"
-          >
-            {{ showFloatingFeedback === "up" ? "👍" : "👎" }}
-          </div>
+          <div class="relative flex-1">
+            <!-- Floating Feedback Animation (relative to this container) - Moved outside flex flow -->
+            <div
+              v-if="showFloatingFeedback"
+              class="absolute -top-16 left-1/2 -translate-x-1/2 pointer-events-none z-50 animate-float-up text-4xl"
+            >
+              {{ showFloatingFeedback === "up" ? "👍" : "👎" }}
+            </div>
 
-          <button
-            @click.stop="handleFeedback(selectedPlace.id, 'up')"
-            class="flex-1 bg-gray-100 text-gray-500 py-4 rounded-[2rem] hover:bg-green-100 hover:text-green-700 transition-all active:scale-95 flex items-center justify-center border border-gray-200 shadow-sm relative group"
-            :class="{
-              'bg-green-100 text-green-700 border-green-200':
-                getFeedback(selectedPlace?.id).userVote === 'up',
-            }"
-            title="Helpful"
-          >
-            <div class="flex items-center space-x-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                :fill="
-                  getFeedback(selectedPlace?.id).userVote === 'up'
-                    ? 'currentColor'
-                    : 'none'
-                "
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="group-active:scale-125 transition-transform"
+            <div class="flex space-x-3">
+              <button
+                @click.stop="handleFeedback(selectedPlace.id, 'up')"
+                class="flex-1 bg-gray-100 text-gray-500 py-4 rounded-[2rem] hover:bg-green-100 hover:text-green-700 transition-all active:scale-95 flex items-center justify-center border border-gray-200 shadow-sm relative group"
+                :class="{
+                  'bg-green-100 text-green-700 border-green-200':
+                    getFeedback(selectedPlace?.id).userVote === 'up',
+                }"
+                title="Helpful"
               >
-                <path d="M7 10v12" />
-                <path
-                  d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"
-                />
-              </svg>
-              <span
-                v-if="getFeedback(selectedPlace?.id).up > 0"
-                class="font-black text-sm"
-                >{{ getFeedback(selectedPlace?.id).up }}</span
+                <div class="flex items-center space-x-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    :fill="
+                      getFeedback(selectedPlace?.id).userVote === 'up'
+                        ? 'currentColor'
+                        : 'none'
+                    "
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="group-active:scale-125 transition-transform"
+                  >
+                    <path d="M7 10v12" />
+                    <path
+                      d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"
+                    />
+                  </svg>
+                  <span
+                    v-if="getFeedback(selectedPlace?.id).up > 0"
+                    class="font-black text-sm"
+                    >{{ getFeedback(selectedPlace?.id).up }}</span
+                  >
+                </div>
+              </button>
+              <button
+                @click.stop="handleFeedback(selectedPlace.id, 'down')"
+                class="flex-1 bg-gray-100 text-gray-500 py-4 rounded-[2rem] hover:bg-red-100 hover:text-red-700 transition-all active:scale-95 flex items-center justify-center border border-gray-200 shadow-sm relative group"
+                :class="{
+                  'bg-red-100 text-red-700 border-red-200':
+                    getFeedback(selectedPlace?.id).userVote === 'down',
+                }"
+                title="Not Helpful"
               >
+                <div class="flex items-center space-x-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    :fill="
+                      getFeedback(selectedPlace?.id).userVote === 'down'
+                        ? 'currentColor'
+                        : 'none'
+                    "
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="group-active:scale-125 transition-transform"
+                  >
+                    <path d="M17 14V2" />
+                    <path
+                      d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"
+                    />
+                  </svg>
+                  <span
+                    v-if="getFeedback(selectedPlace?.id).down > 0"
+                    class="font-black text-sm"
+                    >{{ getFeedback(selectedPlace?.id).down }}</span
+                  >
+                </div>
+              </button>
             </div>
-          </button>
-          <button
-            @click.stop="handleFeedback(selectedPlace.id, 'down')"
-            class="flex-1 bg-gray-100 text-gray-500 py-4 rounded-[2rem] hover:bg-red-100 hover:text-red-700 transition-all active:scale-95 flex items-center justify-center border border-gray-200 shadow-sm relative group"
-            :class="{
-              'bg-red-100 text-red-700 border-red-200':
-                getFeedback(selectedPlace?.id).userVote === 'down',
-            }"
-            title="Not Helpful"
-          >
-            <div class="flex items-center space-x-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                :fill="
-                  getFeedback(selectedPlace?.id).userVote === 'down'
-                    ? 'currentColor'
-                    : 'none'
-                "
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="group-active:scale-125 transition-transform"
-              >
-                <path d="M17 14V2" />
-                <path
-                  d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"
-                />
-              </svg>
-              <span
-                v-if="getFeedback(selectedPlace?.id).down > 0"
-                class="font-black text-sm"
-                >{{ getFeedback(selectedPlace?.id).down }}</span
-              >
-            </div>
-          </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1487,10 +1511,23 @@ const showFloatingFeedback = ref<"up" | "down" | null>(null);
 const selectedPlace = ref<any>(null);
 const isGenerating = ref(false);
 const isGeneratingExtra = ref(false);
+const currentAbortController = ref<AbortController | null>(null);
+
+const cancelGeneration = () => {
+  if (currentAbortController.value) {
+    currentAbortController.value.abort();
+    currentAbortController.value = null;
+  }
+  isGenerating.value = false;
+  isGeneratingExtra.value = false;
+  stopLoadingMessages();
+};
+
 const isConvertingToSpeech = ref(false);
 const isPlayingGuide = ref(false);
 const generatedScript = ref("");
 const generatedExtra = ref("");
+const currentResearchData = ref("");
 const searchLogs = ref<any[]>([]);
 const audioUrl = ref("");
 const isAudioPlaying = ref(false);
@@ -1717,6 +1754,7 @@ const openSavedGuide = (saved: any) => {
   selectedPlace.value = saved;
   generatedScript.value = saved.script || "";
   generatedExtra.value = saved.extra || "";
+  currentResearchData.value = saved.researchData || "";
   searchLogs.value = saved.sources || [];
   audioUrl.value = saved.audioUrl || "";
   activeAudioType.value = saved.audioUrl ? "script" : null;
@@ -1749,10 +1787,14 @@ const generateGuide = async (place: any, isDeepDive = false, force = false) => {
     startLoadingMessages();
     generatedScript.value = "";
     generatedExtra.value = "";
+    currentResearchData.value = "";
     searchLogs.value = [];
     audioUrl.value = "";
     activeAudioType.value = null;
   }
+
+  // Create new AbortController
+  currentAbortController.value = new AbortController();
 
   error.value = null;
   try {
@@ -1767,7 +1809,9 @@ const generateGuide = async (place: any, isDeepDive = false, force = false) => {
         },
         placeLocation: place.location,
         deepDive: isDeepDive,
+        researchData: currentResearchData.value, // Send existing research if available
       },
+      signal: currentAbortController.value.signal,
     });
 
     if (isDeepDive) {
@@ -1781,6 +1825,7 @@ const generateGuide = async (place: any, isDeepDive = false, force = false) => {
     } else {
       generatedScript.value = res.script;
       generatedExtra.value = res.extra || "";
+      currentResearchData.value = res.researchData || "";
       searchLogs.value = res.sources || [];
     }
 
@@ -1788,21 +1833,25 @@ const generateGuide = async (place: any, isDeepDive = false, force = false) => {
       ...(guideCache.value[place.id] || {}),
       script: generatedScript.value,
       extra: generatedExtra.value,
+      researchData: currentResearchData.value,
       sources: searchLogs.value,
       timestamp: Date.now(),
     };
 
-    // Automatically trigger audio after generation
+    // Automatically trigger audio ONLY for initial script
     if (!isDeepDive) {
       speakAloud("script");
-    } else {
-      speakAloud("extra");
     }
   } catch (err: any) {
+    if (err.name === "AbortError") {
+      console.log("[App] Generation cancelled by user.");
+      return;
+    }
     error.value = err.message || "Research failed.";
   } finally {
     isGenerating.value = false;
     isGeneratingExtra.value = false;
+    currentAbortController.value = null;
     stopLoadingMessages();
   }
 };

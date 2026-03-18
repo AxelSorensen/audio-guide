@@ -4,7 +4,7 @@ import { z } from 'zod'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
-  const { name, vicinity, userLocation, placeLocation, deepDive } = body
+  const { name, vicinity, userLocation, placeLocation, deepDive, researchData } = body
 
   if (!name) {
     throw createError({
@@ -32,24 +32,28 @@ export default defineEventHandler(async (event) => {
   }
 
   const openaiProvider = new OpenAIProvider({ apiKey: openaiApiKey })
+  // Silence tracing warning
+  process.env.OPENAI_TRACING_API_KEY = process.env.OPENAI_TRACING_API_KEY || 'disabled'
+  
   setDefaultModelProvider(openaiProvider)
 
   const searchLogs: { query: string, links: { title: string, url: string }[] }[] = []
 
   // Define the output schema
   const TourGuideOutput = z.object({
-    script: z.string().describe("A short, punchy guide script (max 80 words) focusing on visual grounding."),
-    extra: z.string().describe("A deep, comprehensive extension (max 400 words) with new facts and architectural details."),
+    script: z.string().describe("A short, punchy guide script (max 90 words)."),
+    extra: z.string().describe("A deep, comprehensive extension (max 500 words)."),
+    research_summary: z.string().describe("A massive, comprehensive dump of ALL historical facts, stories, architectural details, and fun facts found during research. Use this to pass information to the next run."),
     sources_used: z.array(z.object({
       title: z.string(),
       url: z.string()
-    })).describe("List of verified sources that were actually used to provide facts in the descriptions. DO NOT include sources that were searched but not used.")
+    })).describe("List of verified sources that were actually used.")
   })
 
   // Define the Search Tool using the SDK's "tool" helper
   const webSearchTool = tool({
     name: 'webSearch',
-    description: 'Search the web for specific historical facts, architectural details, and visual descriptions of a location.',
+    description: 'Search the web for specific historical facts, architectural details, and stories.',
     parameters: z.object({
       query: z.string().describe('The search query to look up facts about the location.'),
     }),
@@ -62,7 +66,7 @@ export default defineEventHandler(async (event) => {
           api_key: tavilyApiKey,
           query: query,
           search_depth: 'advanced',
-          max_results: 5
+          max_results: 10
         })
       })
       const data = await response.json()
@@ -97,42 +101,41 @@ export default defineEventHandler(async (event) => {
   // Create the Research & Guide Agent
   const tourGuideAgent = new Agent({
     name: 'HistoricalTourGuide',
-    instructions: `You are a master historical researcher and expert site storyteller. 
-    Your goal is to provide a guide that is rich in history, legends, fun facts, and visual evidence.
-    
-    RESEARCH PROTOCOL:
-    - You MUST conduct multiple, deep searches to find the "soul" of the place.
-    - Look for: Specific historical dates, the people who lived/worked there, hidden architectural symbols, local legends, "fun facts," and "did you know" details.
-    - Do not settle for the first search result. Cross-reference to find unique stories that aren't on every tourist plaque.
-    - Find the "why" behind the "what". Why was it built this way? What scandalous or heroic thing happened here?
+    instructions: `You are a clinical historical researcher and expert site archivist. 
+    Your goal is to provide a guide that is 100% concrete facts, specific details, and raw historical data. 
 
-    STORYTELLING & VISUAL GROUNDING:
-    - Balance deep history with visual cues. Connect the stories to what the user is seeing.
-    - "While you look at that soot-stained brick, imagine it in 1890 when..."
-    - "That tiny inscription above the door? It's actually a secret mark from the mason who..."
-    - "People say this courtyard is haunted by [Name], a [Profession] who disappeared in [Year]..."
+    ABSOLUTELY FORBIDDEN:
+    - Vague, flowery AI marketing language: "echoes tales of...", "storied sanctuary", "timeless devotion", "testament to...", "step into a chapter", "whispers of the past", "vibrant", "nestled", "rich history".
+    - Any sentence that doesn't contain a specific fact, name, date, or material.
+
+    REQUIRED PROTOCOL:
+    - Speak in RAW DATA and CONCRETE ANECDOTES.
+    - If you find a story, tell the specific events: "In 1842, [Name] was arrested here for [Reason]" rather than "This place has seen many struggles."
+    - Be surgical with architectural details: Mention "English bond brickwork," "Doric columns," "12-millimeter lead glazing," or "hand-carved limestone from [Quarry]."
+    - Use numbers: Heights, weights, costs, dates, specific counts of windows/statues.
+
+    RESEARCH PROTOCOL:
+    - IF deepDive is false: You MUST conduct at least 4 deep searches to gather raw data. Look for the most obscure, specific facts possible.
+    - IF deepDive is true: DO NOT SEARCH. Use only the provided 'researchData'.
 
     CONTENT STRUCTURE:
     
     If deepDive is false:
-    1. "script": A short, punchy, but story-rich guide (max 90 words). Start with a hook—a shocking fact or a legendary story. Orient the user using the spatial context.
+    1. "script": A dense, fact-packed guide (max 90 words). Start immediately with a specific date or name. No preamble.
     2. "extra": You MUST return an empty string "". 
-    3. "sources_used": All sources you found during your research.
+    3. "research_summary": A massive, raw data dump of every single specific detail you found. 
+    4. "sources_used": All sources used.
 
     If deepDive is true:
     1. "script": Keep the previous script.
-    2. "extra": A deep, narrative extension (max 500 words). 
-       - Dive deep into the archives. Tell the full story.
-       - Include architectural details, material history, and "fun facts".
-       - Discuss the social context: Who used this building? What was life like here?
-       - Mention specific names of architects, owners, or historical figures.
-    3. "sources_used": All sources used.
+    2. "extra": A deep, narrative extension (max 500 words). Focus on granular details: specific architects, ownership history, material origins, and documented historical events. 
+    3. "research_summary": Pass back the existing researchData.
+    4. "sources_used": All sources used.
 
     CRITICAL CONSTRAINTS:
-    - NO FLUFF or "nestled/vibrant". Use "brutal," "decadent," "worn," "meticulous."
-    - Be a storyteller, not a textbook. Use active, engaging language.
-    - Stay 100% factual. If a story is a legend, state it as such ("Local legend says...").
-    - Be strict about "sources_used": ONLY include links that provided specific facts you actually used.`,
+    - Write like an encyclopedia entry mixed with a technical field report. 
+    - If you can't find a specific fact, describe the physical material you found in search results.
+    - NO ADJECTIVES unless they describe a physical property (e.g., "oxidized," "concave," "granite").`,
     tools: [webSearchTool],
     model: await openaiProvider.getModel('gpt-4o'),
     outputType: TourGuideOutput
@@ -140,8 +143,8 @@ export default defineEventHandler(async (event) => {
 
   try {
     const prompt = deepDive 
-      ? `DRILL DOWN: Provide an exhaustive historical and architectural deep dive for ${name} in/near ${vicinity || 'unknown'}. Focus on specific evidence, dates, and technical details.`
-      : `Research and tell me about: ${name} in/near ${vicinity || 'unknown'}. ${spatialContext}.`
+      ? `USE THIS RESEARCH TO WRITE A DEEP DIVE (DO NOT SEARCH): ${researchData}. \n\n Task: Provide an exhaustive narrative extension for ${name} in/near ${vicinity || 'unknown'}.`
+      : `CONDUCT FULL RESEARCH AND WRITE SCRIPT: Research everything about ${name} in/near ${vicinity || 'unknown'}. ${spatialContext}. Search for history, stories, architectural details, and fun facts.`
     
     const result = await run(tourGuideAgent, prompt)
     const finalOutput = result.finalOutput
@@ -150,11 +153,12 @@ export default defineEventHandler(async (event) => {
       throw new Error('Agent failed to produce structured output.')
     }
 
-    const { script, extra, sources_used } = finalOutput
+    const { script, extra, research_summary, sources_used } = finalOutput
 
     return {
       script: script,
       extra: extra,
+      researchData: research_summary,
       sources: sources_used
     }
 
