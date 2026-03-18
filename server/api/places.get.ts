@@ -25,10 +25,7 @@ export default defineEventHandler(async (event) => {
   try {
     const url = 'https://places.googleapis.com/v1/places:searchNearby'
     
-    /**
-     * Places API (New) strictly requires "Table A" types for searchNearby.
-     * Table B types (like 'natural_feature', 'landmark') will cause 400 errors.
-     */
+    // Define Table A types based on filter
     let includedTypes = [
       'tourist_attraction', 
       'museum', 
@@ -42,10 +39,8 @@ export default defineEventHandler(async (event) => {
     if (typeFilter === 'culture') {
       includedTypes = ['museum', 'art_gallery', 'cultural_center', 'library', 'performing_arts_theater']
     } else if (typeFilter === 'nature') {
-      // 'hiking_area' and 'beach' are Table A. 'national_park' is Table A.
       includedTypes = ['park', 'hiking_area', 'beach', 'national_park', 'zoo', 'aquarium']
     } else if (typeFilter === 'history') {
-      // 'historical_landmark' is the primary one. 'church' etc are Table A.
       includedTypes = ['historical_landmark', 'church', 'monument', 'castle', 'embassy']
     }
 

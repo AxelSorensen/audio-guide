@@ -1,10 +1,10 @@
-import { Agent, run, tool } from '@openai/agents'
+import { Agent, run, tool, setDefaultModelProvider } from '@openai/agents'
 import { OpenAIProvider } from '@openai/agents-openai'
 import { z } from 'zod'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
-  const { name, vicinity, userLocation, placeLocation } = body
+  const { name, vicinity, userLocation, placeLocation, deepDive } = body
 
   if (!name) {
     throw createError({
@@ -32,8 +32,19 @@ export default defineEventHandler(async (event) => {
   }
 
   const openaiProvider = new OpenAIProvider({ apiKey: openaiApiKey })
+  setDefaultModelProvider(openaiProvider)
 
   const searchLogs: { query: string, links: { title: string, url: string }[] }[] = []
+
+  // Define the output schema
+  const TourGuideOutput = z.object({
+    script: z.string().describe("A short, punchy guide script (max 80 words) focusing on visual grounding."),
+    extra: z.string().describe("A deep, comprehensive extension (max 400 words) with new facts and architectural details."),
+    sources_used: z.array(z.object({
+      title: z.string(),
+      url: z.string()
+    })).describe("List of verified sources that were actually used to provide facts in the descriptions. DO NOT include sources that were searched but not used.")
+  })
 
   // Define the Search Tool using the SDK's "tool" helper
   const webSearchTool = tool({
@@ -86,32 +97,63 @@ export default defineEventHandler(async (event) => {
   // Create the Research & Guide Agent
   const tourGuideAgent = new Agent({
     name: 'HistoricalTourGuide',
-    instructions: `You are a direct, no-nonsense historical researcher. 
-    Find the most interesting real fact about a place and tell it simply.
+    instructions: `You are a direct, no-nonsense historical researcher and expert site guide. 
+    Your goal is to provide a guide that feels like you are standing right next to the user, pointing at specific details they can see.
+
+    RESEARCH PROTOCOL:
+    - Even for a short script, you MUST conduct thorough research. Find multiple sources to verify architectural details, specific materials, and historical dates.
+    - Use the search tool until you have a complete visual understanding of the building/site.
+    - Look for obscure but true facts that a casual observer might miss.
+
+    VISUAL GROUNDING:
+    - Use search results to find specific architectural details (colors, materials, window shapes, statues, inscriptions).
+    - Use phrases like "Notice the...", "Look up at the...", "If you look closely at the [material] walls...", "To your left, you'll see...".
+    - Connect facts to visual evidence.
+
+    CONTENT STRUCTURE:
     
+    If deepDive is false:
+    1. "script": A short, punchy guide (max 80 words). Start with the most striking visual feature or fact. Orient the user using the spatial context.
+    2. "extra": You MUST return an empty string "". Do not generate detailed research yet.
+    3. "sources_used": All sources you found during your thorough research.
+
+    If deepDive is true:
+    1. "script": Keep the previous short script.
+    2. "extra": A deep, comprehensive extension (max 400 words). 
+       - DO NOT REPEAT facts from the "script". 
+       - Move into the "why" and "how". Discuss specific architects, historical turning points, or hidden symbols in the masonry.
+       - Include legends or "inside stories" that aren't immediately obvious.
+       - Continue the visual tour: "Beyond that archway...", "The interior, which was renovated in [Year], features...".
+    3. "sources_used": All sources used for both the script and this deep dive.
+
     CRITICAL CONSTRAINTS:
-    - NO FANCY ADJECTIVES. Do not use "nestled," "vibrant," "intriguing," "testament to," or "stunning." 
-    - NO MARKETING FLUFF. Just the facts.
-    - BE SPECIFIC. Use exact years, specific names, and building materials.
-    - START WITH THE HOOK. Put the most interesting fact in the first sentence.
-    - MAXIMUM 80 WORDS. Keep it short.
-    - Use British English and pointer directions from the spatial context.
-    - Write ONLY spoken text.`,
+    - NO FANCY ADJECTIVES like "nestled" or "vibrant". Use descriptive ones like "oxidised copper," "brutalist concrete," or "soot-stained brick."
+    - Write ONLY spoken text.
+    - Stay factual and evidence-based.
+    - Be strict about "sources_used": ONLY include links that provided specific facts you actually incorporated into your internal model or the final output.`,
     tools: [webSearchTool],
-    model: await openaiProvider.getModel('gpt-4o')
+    model: await openaiProvider.getModel('gpt-4o'),
+    outputType: TourGuideOutput
   })
 
   try {
-    const result = await run(tourGuideAgent, `Research and tell me about: ${name} in/near ${vicinity || 'unknown'}. ${spatialContext}`)
-    const script = result.finalOutput
+    const prompt = deepDive 
+      ? `DRILL DOWN: Provide an exhaustive historical and architectural deep dive for ${name} in/near ${vicinity || 'unknown'}. Focus on specific evidence, dates, and technical details.`
+      : `Research and tell me about: ${name} in/near ${vicinity || 'unknown'}. ${spatialContext}.`
+    
+    const result = await run(tourGuideAgent, prompt)
+    const finalOutput = result.finalOutput
 
-    if (!script) {
-      throw new Error('Failed to generate script')
+    if (!finalOutput) {
+      throw new Error('Agent failed to produce structured output.')
     }
 
+    const { script, extra, sources_used } = finalOutput
+
     return {
-      script,
-      sources: searchLogs
+      script: script,
+      extra: extra,
+      sources: sources_used
     }
 
   } catch (error: any) {
