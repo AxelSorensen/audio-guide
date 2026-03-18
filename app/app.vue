@@ -290,96 +290,137 @@
 
     <!-- UI Overlay: Bottom Sheet for Places -->
     <div
-      class="absolute bottom-0 left-0 right-0 bg-white rounded-t-[2.5rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] z-20 h-[60vh] min-h-[60vh] max-h-[60vh] flex flex-col border-t border-gray-100 transition-all duration-500 ease-in-out"
+      class="absolute bottom-0 left-0 right-0 bg-white shadow-[0_-8px_30px_rgba(0,0,0,0.12)] z-20 h-screen flex flex-col border-t border-gray-100 will-change-transform"
       :class="{
         'translate-y-full opacity-0': isPlayingGuide || showFavorites,
-        'translate-y-[42.5vh]':
-          isSheetCollapsed && !isPlayingGuide && !showFavorites,
-        'translate-y-0':
-          !isSheetCollapsed && !isPlayingGuide && !showFavorites,
+        'rounded-t-[2.5rem] overflow-hidden': currentSnapState !== 'full',
+        'rounded-t-none': currentSnapState === 'full',
       }"
+      :style="
+        !isDragging && !isPlayingGuide && !showFavorites
+          ? {
+              transform: `translateY(${snapPoints[currentSnapState]}px)`,
+              transition: `transform ${snapDuration}ms cubic-bezier(0.34, 1.56, 0.64, 1)`,
+              borderRadius: currentSnapState === 'full' ? '0px' : '2.5rem 2.5rem 0 0',
+            }
+          : isDragging && !isPlayingGuide && !showFavorites
+            ? {
+                transform: `translateY(${dragY}px)`,
+                borderRadius: dragY < 40 ? '0px' : '2.5rem 2.5rem 0 0',
+                transition: 'none',
+              }
+            : {}
+      "
     >
-      <!-- Clickable Handle to Expand/Collapse -->
+      <!-- Draggable Header Section (Handle + Title + Filters) -->
       <div
-        class="w-full pt-4 pb-2 flex-shrink-0 cursor-pointer touch-none"
-        @click="isSheetCollapsed = !isSheetCollapsed"
+        class="w-full flex-shrink-0 cursor-grab active:cursor-grabbing touch-none bg-white"
+        @mousedown="onDragStart"
+        @touchstart="onDragStart"
       >
-        <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto"></div>
-      </div>
-
-      <!-- List Header with Integrated Filters -->
-      <div class="px-8 pt-4 pb-2 flex-shrink-0 text-left">
-        <div class="flex justify-between items-center mb-4">
-          <div class="text-left">
-            <h2 class="text-xl font-black text-gray-900">
-              {{ currentCategoryLabel }} Near You
-            </h2>
-            <p
-              class="text-[10px] text-gray-400 font-bold uppercase tracking-wider text-left"
-            >
-              {{ currentRadius }}m scan radius
-            </p>
-          </div>
-          <button
-            @click="refreshScan"
-            :disabled="isFetchingPlaces"
-            class="p-2 text-indigo-600 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-colors disabled:opacity-50"
+        <!-- Clickable Handle (Fixed height to prevent flash) -->
+        <div
+          class="w-full h-12 flex flex-col items-center justify-center"
+          @click="handleSheetClick"
+        >
+          <div
+            v-if="currentSnapState !== 'full'"
+            class="w-12 h-1.5 bg-gray-200 rounded-full"
+          ></div>
+          <div
+            v-else
+            class="text-gray-300 hover:text-gray-500 transition-colors flex items-center justify-center"
           >
             <svg
-              v-if="isFetchingPlaces"
-              class="animate-spin h-5 w-5"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-                fill="none"
-              ></circle>
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-            <svg
-              v-else
               xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
+              width="24"
+              height="24"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              stroke-width="2.5"
+              stroke-width="3"
               stroke-linecap="round"
               stroke-linejoin="round"
             >
-              <path d="M21 2v6h-6"></path>
-              <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
-              <path d="M3 22v-6h6"></path>
-              <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+              <path d="m6 9 6 6 6-6" />
             </svg>
-          </button>
+          </div>
         </div>
 
-        <!-- Inline Filters -->
-        <div class="flex space-x-2 overflow-x-auto pb-4 no-scrollbar">
-          <button
-            v-for="f in categories"
-            :key="f.id"
-            @click="setCategory(f.id)"
-            class="px-4 py-2 rounded-xl text-[10px] font-black transition-all whitespace-nowrap border uppercase tracking-widest"
-            :class="
-              currentCategory === f.id
-                ? 'bg-gray-900 text-white border-gray-900'
-                : 'bg-gray-50 text-gray-500 border-gray-100'
-            "
-          >
-            {{ f.label }}
-          </button>
+        <!-- List Header with Integrated Filters -->
+        <div class="px-8 pt-4 pb-2 text-left">
+          <div class="flex justify-between items-center mb-4">
+            <div class="text-left">
+              <h2 class="text-xl font-black text-gray-900">
+                {{ currentCategoryLabel }} Near You
+              </h2>
+              <p
+                class="text-[10px] text-gray-400 font-bold uppercase tracking-wider text-left"
+              >
+                {{ currentRadius }}m scan radius
+              </p>
+            </div>
+            <button
+              @click.stop="refreshScan"
+              :disabled="isFetchingPlaces"
+              class="p-2 text-indigo-600 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-colors disabled:opacity-50"
+            >
+              <svg
+                v-if="isFetchingPlaces"
+                class="animate-spin h-5 w-5"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                  fill="none"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              <svg
+                v-else
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 2v6h-6"></path>
+                <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                <path d="M3 22v-6h6"></path>
+                <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Inline Filters -->
+          <div class="flex space-x-2 overflow-x-auto pb-4 no-scrollbar">
+            <button
+              v-for="f in categories"
+              :key="f.id"
+              @click.stop="setCategory(f.id)"
+              class="px-4 py-2 rounded-xl text-[10px] font-black transition-all whitespace-nowrap border uppercase tracking-widest"
+              :class="
+                currentCategory === f.id
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'bg-gray-50 text-gray-500 border-gray-100'
+              "
+            >
+              {{ f.label }}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1192,7 +1233,136 @@ const error = ref<string | null>(null);
 const places = ref<any[]>([]);
 const isFetchingPlaces = ref(false);
 const showFavorites = ref(false);
-const isSheetCollapsed = ref(false);
+const isSheetCollapsed = ref(false); // We'll keep this for the 'peek' state vs 'expanded/full'
+
+// 3-State Draggable Sheet Logic
+const sheetHeight = computed(() => (typeof window !== "undefined" ? window.innerHeight : 0));
+const snapPoints = computed(() => {
+  const h = sheetHeight.value;
+  return {
+    full: 0,
+    expanded: h * 0.4, // 60% visible (100 - 60 = 40)
+    peek: h * 0.9, // 10% visible (100 - 10 = 90)
+    hidden: h,
+  };
+});
+
+const currentSnapState = ref<"peek" | "expanded" | "full">("expanded");
+const isDragging = ref(false);
+const dragY = ref(0);
+const startTouchY = ref(0);
+const startSheetY = ref(0);
+const startTime = ref(0);
+const snapDuration = ref(300);
+
+const onDragStart = (e: TouchEvent | MouseEvent) => {
+  if (isPlayingGuide.value || showFavorites.value) return;
+  isDragging.value = true;
+  startTime.value = Date.now();
+  const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+  startTouchY.value = clientY;
+
+  // Calculate current Y based on state
+  startSheetY.value = snapPoints.value[currentSnapState.value];
+  dragY.value = startSheetY.value;
+
+  window.addEventListener("touchmove", onDragMove, { passive: false });
+  window.addEventListener("touchend", onDragEnd);
+  window.addEventListener("mousemove", onDragMove);
+  window.addEventListener("mouseup", onDragEnd);
+};
+
+const onDragMove = (e: TouchEvent | MouseEvent) => {
+  if (!isDragging.value) return;
+  const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+  const delta = clientY - startTouchY.value;
+  let newY = startSheetY.value + delta;
+
+  // Rubber-banding / Resistance at edges
+  const points = snapPoints.value;
+  if (newY < points.full) {
+    newY = points.full + (newY - points.full) * 0.15;
+  } else if (newY > points.peek) {
+    newY = points.peek + (newY - points.peek) * 0.15;
+  }
+
+  // Final constrain for absolute safety
+  const h = sheetHeight.value;
+  if (newY < -50) newY = -50;
+  if (newY > h + 50) newY = h + 50;
+
+  dragY.value = newY;
+  if ("touches" in e) e.preventDefault();
+};
+
+const onDragEnd = (e: TouchEvent | MouseEvent) => {
+  if (!isDragging.value) return;
+  isDragging.value = false;
+
+  const duration = Date.now() - startTime.value;
+  const clientY =
+    "changedTouches" in e ? e.changedTouches[0].clientY : (e as MouseEvent).clientY;
+  const deltaY = clientY - startTouchY.value;
+  const velocity = deltaY / duration; // px/ms
+
+  const points = snapPoints.value;
+  const currentY = dragY.value;
+
+  let targetState = currentSnapState.value;
+
+  // If flicked with enough velocity, jump to next/prev state
+  if (Math.abs(velocity) > 0.5) {
+    if (velocity < 0) {
+      // Swiping UP
+      if (currentSnapState.value === "peek") targetState = "expanded";
+      else if (currentSnapState.value === "expanded") targetState = "full";
+      else targetState = "full";
+    } else {
+      // Swiping DOWN
+      if (currentSnapState.value === "full") targetState = "expanded";
+      else if (currentSnapState.value === "expanded") targetState = "peek";
+      else targetState = "peek";
+    }
+  } else {
+    // Normal distance-based snapping
+    const distances = [
+      { state: "full", dist: Math.abs(currentY - points.full) },
+      { state: "expanded", dist: Math.abs(currentY - points.expanded) },
+      { state: "peek", dist: Math.abs(currentY - points.peek) },
+    ];
+    distances.sort((a, b) => a.dist - b.dist);
+    targetState = distances[0].state as any;
+  }
+
+  // Calculate a natural-feeling duration based on velocity or distance
+  const targetY = points[targetState];
+  const distance = Math.abs(currentY - targetY);
+  const calculatedDuration = Math.max(
+    250,
+    Math.min(800, distance / Math.abs(velocity || 0.4)),
+  );
+  snapDuration.value = calculatedDuration;
+
+  currentSnapState.value = targetState;
+  isSheetCollapsed.value = currentSnapState.value === "peek";
+
+  window.removeEventListener("touchmove", onDragMove);
+  window.removeEventListener("touchend", onDragEnd);
+  window.removeEventListener("mousemove", onDragMove);
+  window.removeEventListener("mouseup", onDragEnd);
+};
+
+const handleSheetClick = () => {
+  if (isDragging.value) return;
+  // Toggle between Peek and Expanded on click
+  if (currentSnapState.value === "peek") {
+    currentSnapState.value = "expanded";
+    isSheetCollapsed.value = false;
+  } else {
+    currentSnapState.value = "peek";
+    isSheetCollapsed.value = true;
+  }
+};
 
 const currentRadius = ref(500);
 const currentCategory = ref("all");
