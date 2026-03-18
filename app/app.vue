@@ -12,6 +12,7 @@
         :center="mapCenter"
         :zoom="mapZoom"
         :disable-default-ui="true"
+        :gesture-handling="'greedy'"
         :styles="mapStyles"
         :map-id="'bf1cf3607cc60027'"
         @click="isSheetCollapsed = true"
@@ -609,10 +610,14 @@
             class="flex-1 pr-2 relative z-10 cursor-pointer group/progress h-4 flex items-center"
             @click="seekAudio"
           >
-            <div class="w-full h-1 bg-gray-200 rounded-full overflow-hidden relative">
+            <div
+              class="w-full h-1 bg-gray-200 rounded-full overflow-hidden relative"
+            >
               <!-- Hover Indicator -->
-              <div class="absolute inset-0 bg-indigo-200 opacity-0 group-hover/progress:opacity-30 transition-opacity"></div>
-              
+              <div
+                class="absolute inset-0 bg-indigo-200 opacity-0 group-hover/progress:opacity-30 transition-opacity"
+              ></div>
+
               <div
                 class="h-full bg-indigo-500 transition-all duration-100"
                 :style="{ width: audioProgress + '%' }"
@@ -915,9 +920,15 @@
                 </p>
               </div>
               <div class="space-y-2">
-                <div class="h-3 bg-gray-100 rounded-full w-full animate-pulse"></div>
-                <div class="h-3 bg-gray-100 rounded-full w-5/6 animate-pulse"></div>
-                <div class="h-3 bg-gray-100 rounded-full w-4/6 animate-pulse"></div>
+                <div
+                  class="h-3 bg-gray-100 rounded-full w-full animate-pulse"
+                ></div>
+                <div
+                  class="h-3 bg-gray-100 rounded-full w-5/6 animate-pulse"
+                ></div>
+                <div
+                  class="h-3 bg-gray-100 rounded-full w-4/6 animate-pulse"
+                ></div>
               </div>
             </div>
 
@@ -1010,7 +1021,12 @@
       <div class="mt-8 space-y-4">
         <!-- Tell Me More (Primary Action) -->
         <div
-          v-if="!generatedExtra && !isGenerating && !isGeneratingExtra && generatedScript"
+          v-if="
+            !generatedExtra &&
+            !isGenerating &&
+            !isGeneratingExtra &&
+            generatedScript
+          "
           class="animate-in"
         >
           <button
@@ -1480,6 +1496,20 @@ onMounted(async () => {
   // Try to start automatically
   resume();
 
+  // Center map once on startup when both map and position are ready
+  const stopMapWatch = watch(
+    [userPosition, () => mapRef.value?.map],
+    ([pos, map]) => {
+      if (pos && map) {
+        setTimeout(() => {
+          centerMap();
+        }, 500);
+        stopMapWatch(); // Only do this once on startup
+      }
+    },
+    { immediate: true },
+  );
+
   // Also trigger manual request to ensure prompt on mobile
   requestLocation();
 });
@@ -1573,7 +1603,7 @@ const toggleFavorite = (place: any) => {
     favorites.value.splice(index, 1);
   } else {
     favorites.value.push({ ...place, ...(guideCache.value[place.id] || {}) });
-    
+
     // Trigger micro-interaction
     showFloatingHeart.value = true;
     setTimeout(() => {
@@ -1601,7 +1631,7 @@ const generateGuide = async (place: any, isDeepDive = false, force = false) => {
   }
   selectedPlace.value = place;
   isPlayingGuide.value = true;
-  
+
   if (isDeepDive) {
     isGeneratingExtra.value = true;
   } else {
@@ -1629,12 +1659,14 @@ const generateGuide = async (place: any, isDeepDive = false, force = false) => {
         deepDive: isDeepDive,
       },
     });
-    
+
     if (isDeepDive) {
       generatedExtra.value = res.extra || "";
       // Append new sources if any
-      const existingUrls = new Set(searchLogs.value.map(s => s.url));
-      const newSources = (res.sources || []).filter((s: any) => !existingUrls.has(s.url));
+      const existingUrls = new Set(searchLogs.value.map((s) => s.url));
+      const newSources = (res.sources || []).filter(
+        (s: any) => !existingUrls.has(s.url),
+      );
       searchLogs.value = [...searchLogs.value, ...newSources];
     } else {
       generatedScript.value = res.script;
@@ -1730,6 +1762,11 @@ const closePlayer = () => {
 @import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
 body {
   font-family: "Plus Jakarta Sans", sans-serif;
+  overflow: hidden;
+  overscroll-behavior: none;
+  position: fixed;
+  width: 100%;
+  height: 100%;
 }
 .animate-in {
   animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
