@@ -1606,7 +1606,6 @@ const requestLocation = () => {
           lng: position.coords.longitude,
         };
         userPosition.value = pos;
-        mapCenter.value = pos;
         fetchPlaces();
       },
       (err) => {
@@ -1631,6 +1630,8 @@ const userPosition = ref<{ lat: number; lng: number } | null>(null);
 const error = ref<string | null>(null);
 const places = ref<any[]>([]);
 const isFetchingPlaces = ref(false);
+const initialFetchStarted = ref(false);
+const hasInitialCentered = ref(false);
 const showFavorites = ref(false);
 const isSheetCollapsed = ref(false); // We'll keep this for the 'peek' state vs 'expanded/full'
 
@@ -2235,26 +2236,30 @@ onMounted(async () => {
   // Try to start automatically
   resume();
 
-  // Center map once on startup when both map, position, and initial data are ready
-  const stopMapWatch = watch(
-    [userPosition, () => mapRef.value?.map, isFetchingPlaces, () => places.value.length],
-    ([pos, map, fetching, placesCount]) => {
-      // We wait for:
-      // 1. Position acquired
-      // 2. Map instance exists
-      // 3. First fetch has finished OR we already have places (from cache/previous)
-      if (pos && map && !fetching && placesCount > 0) {
-        mapCenter.value = { ...pos };
-        centerMap();
-        stopMapWatch(); // Only do this once on startup
-      }
-    },
-    { immediate: true },
-  );
-
   // Also trigger manual request to ensure prompt on mobile
   requestLocation();
 });
+
+// Center map once on startup when both map, position, and initial data are ready
+// This is outside onMounted to be more reactive and handle map initialization reliably
+watch(
+  [userPosition, () => mapRef.value?.map, isFetchingPlaces, initialFetchStarted],
+  ([pos, map, fetching, started]) => {
+    // We wait for:
+    // 1. Position acquired
+    // 2. Map instance exists
+    // 3. First fetch has at least started and then finished
+    if (!hasInitialCentered.value && pos && map && started && !fetching) {
+      console.log("[App] Initial centering conditions met", { pos, started, fetching });
+      // Small timeout to ensure map layout is settled
+      setTimeout(() => {
+        centerMap();
+        hasInitialCentered.value = true;
+      }, 150);
+    }
+  },
+  { immediate: true },
+);
 
 watch(
   () => coords.value,
@@ -2263,7 +2268,6 @@ watch(
       const pos = { lat: newCoords.latitude, lng: newCoords.longitude };
       userPosition.value = pos;
       if (places.value.length === 0 && !isFetchingPlaces.value) {
-        mapCenter.value = pos;
         fetchPlaces();
       }
     }
@@ -2292,6 +2296,7 @@ const centerMap = () => {
 
 const fetchPlaces = async () => {
   if (!userPosition.value) return;
+  initialFetchStarted.value = true;
   isFetchingPlaces.value = true;
   error.value = null;
   try {
