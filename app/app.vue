@@ -201,7 +201,7 @@
           <!-- Add Custom Place Button -->
           <button
             @click="startAddingCustom"
-            class="bg-white p-3 rounded-full shadow-lg text-green-600 hover:bg-green-50 transition-all hover:scale-110 active:scale-95 border border-gray-100"
+            class="bg-white p-3 rounded-full shadow-lg text-blue-600 hover:bg-blue-50 transition-all hover:scale-110 active:scale-95 border border-gray-100 flex items-center justify-center"
             title="Add Custom Location"
           >
             <svg
@@ -214,8 +214,9 @@
               stroke-width="3"
               stroke-linecap="round"
               stroke-linejoin="round"
+              class="shrink-0"
             >
-              <path d="M12 5v12" />
+              <path d="M12 5v14" />
               <path d="M5 12h14" />
             </svg>
           </button>
@@ -229,7 +230,7 @@
       class="absolute inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/5"
     >
       <div
-        class="bg-white w-full max-w-md rounded-[2.5rem] p-6 shadow-2xl border border-indigo-50 flex flex-col max-h-[85svh] animate-in"
+        class="bg-white w-full max-w-md rounded-[2.5rem] p-6 shadow-2xl border border-indigo-50 flex flex-col max-h-[85svh] animate-in overflow-hidden"
       >
         <div class="text-center mb-6 flex-shrink-0">
           <h2 class="text-2xl font-black text-gray-900">Add Custom Place</h2>
@@ -240,7 +241,7 @@
           </p>
         </div>
 
-        <div class="space-y-3 flex-1 pb-4">
+        <div class="space-y-3 flex-1 overflow-y-auto pr-2 no-scrollbar pb-4">
           <div>
             <label
               class="block text-[10px] font-black uppercase text-indigo-400 mb-1 ml-1"
@@ -256,29 +257,241 @@
           </div>
 
           <div>
-            <label
-              class="block text-[10px] font-black uppercase text-indigo-400 mb-1 ml-1"
-            >
-              Brief Description
-            </label>
-            <textarea
-              v-model="newPlaceData.description"
-              placeholder="A short summary..."
-              class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all h-14 resize-none"
-            ></textarea>
+            <div class="flex items-center justify-between mb-1.5 ml-1">
+              <label
+                class="block text-[10px] font-black uppercase text-indigo-400"
+              >
+                Brief Description
+              </label>
+              <!-- Record/Stop Button -->
+              <button
+                @click.stop="isRecording ? stopRecording() : startRecording('description')"
+                class="flex items-center space-x-1.5 px-2 py-1 rounded-lg transition-all active:scale-95"
+                :class="
+                  isRecording && activeRecordingTarget === 'description'
+                    ? 'bg-red-50 text-red-600 animate-pulse'
+                    : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                "
+              >
+                <div
+                  v-if="isRecording && activeRecordingTarget === 'description'"
+                  class="w-2.5 h-2.5 bg-red-600 rounded-sm"
+                ></div>
+                <svg
+                  v-else
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"
+                  />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" x2="12" y1="19" y2="22" />
+                </svg>
+                <span class="text-[9px] font-black uppercase">{{
+                  isRecording && activeRecordingTarget === "description" ? "Stop Recording" : "Record"
+                }}</span>
+              </button>
+            </div>
+            <div class="relative">
+              <textarea
+                v-model="newPlaceData.description"
+                :disabled="isTranscribing && activeRecordingTarget === 'description'"
+                placeholder="Type or record your story..."
+                class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all h-14 resize-none disabled:opacity-50"
+              ></textarea>
+              <!-- Transcribing Overlay -->
+              <div
+                v-if="isTranscribing && activeRecordingTarget === 'description'"
+                class="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center rounded-xl animate-in"
+              >
+                <div class="flex items-center space-x-2">
+                  <svg
+                    class="animate-spin h-3 w-3 text-indigo-600"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      class="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      stroke-width="4"
+                      fill="none"
+                    ></circle>
+                    <path
+                      class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  <span
+                    class="text-[9px] font-black uppercase text-indigo-600 tracking-wider"
+                    >Transcribing...</span
+                  >
+                </div>
+              </div>
+            </div>
           </div>
 
           <div>
-            <label
-              class="block text-[10px] font-black uppercase text-indigo-400 mb-1 ml-1"
+            <div class="flex items-center justify-between mb-1.5 ml-1">
+              <label
+                class="block text-[10px] font-black uppercase text-indigo-400"
+              >
+                Detailed Guide (Optional)
+              </label>
+              <!-- Record/Stop Button for Detailed -->
+              <button
+                @click.stop="
+                  isRecording
+                    ? stopRecording()
+                    : startRecording('detailedDescription')
+                "
+                class="flex items-center space-x-1.5 px-2 py-1 rounded-lg transition-all active:scale-95"
+                :class="
+                  isRecording && activeRecordingTarget === 'detailedDescription'
+                    ? 'bg-red-50 text-red-600 animate-pulse'
+                    : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                "
+              >
+                <div
+                  v-if="
+                    isRecording &&
+                    activeRecordingTarget === 'detailedDescription'
+                  "
+                  class="w-2.5 h-2.5 bg-red-600 rounded-sm"
+                ></div>
+                <svg
+                  v-else
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"
+                  />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" x2="12" y1="19" y2="22" />
+                </svg>
+                <span class="text-[9px] font-black uppercase">{{
+                  isRecording && activeRecordingTarget === "detailedDescription"
+                    ? "Stop Recording"
+                    : "Record"
+                }}</span>
+              </button>
+            </div>
+            <div class="relative">
+              <textarea
+                v-model="newPlaceData.detailedDescription"
+                :disabled="
+                  isTranscribing &&
+                  activeRecordingTarget === 'detailedDescription'
+                "
+                placeholder="Tell the full story..."
+                class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all h-20 resize-none disabled:opacity-50"
+              ></textarea>
+              <!-- Transcribing Overlay -->
+              <div
+                v-if="
+                  isTranscribing &&
+                  activeRecordingTarget === 'detailedDescription'
+                "
+                class="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center rounded-xl animate-in"
+              >
+                <div class="flex items-center space-x-2">
+                  <svg
+                    class="animate-spin h-3 w-3 text-indigo-600"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      class="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      stroke-width="4"
+                      fill="none"
+                    ></circle>
+                    <path
+                      class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  <span
+                    class="text-[9px] font-black uppercase text-indigo-600 tracking-wider"
+                    >Transcribing...</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Audio Preference Toggle -->
+          <div
+            class="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100"
+          >
+            <span class="text-[10px] font-black uppercase text-indigo-400"
+              >Narration</span
             >
-              Detailed Guide (Optional)
-            </label>
-            <textarea
-              v-model="newPlaceData.detailedDescription"
-              placeholder="Tell the full story..."
-              class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all h-20 resize-none"
-            ></textarea>
+            <div class="flex items-center space-x-3">
+              <span
+                class="text-[9px] font-black uppercase transition-colors"
+                :class="
+                  newPlaceData.useOriginalAudio
+                    ? 'text-indigo-600'
+                    : 'text-gray-400'
+                "
+                >Your Recording</span
+              >
+              <button
+                @click="
+                  newPlaceData.useOriginalAudio = !newPlaceData.useOriginalAudio
+                "
+                class="w-10 h-6 bg-gray-200 rounded-full relative transition-colors"
+              >
+                <div
+                  class="absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform flex items-center justify-center"
+                  :class="
+                    newPlaceData.useOriginalAudio
+                      ? 'translate-x-0'
+                      : 'translate-x-4'
+                  "
+                >
+                  <div
+                    class="w-2 h-2 rounded-full"
+                    :class="
+                      newPlaceData.useOriginalAudio
+                        ? 'bg-indigo-600'
+                        : 'bg-gray-400'
+                    "
+                  ></div>
+                </div>
+              </button>
+              <span
+                class="text-[9px] font-black uppercase transition-colors"
+                :class="
+                  !newPlaceData.useOriginalAudio
+                    ? 'text-indigo-600'
+                    : 'text-gray-400'
+                "
+                >AI</span
+              >
+            </div>
           </div>
 
           <div
@@ -339,6 +552,7 @@
         </div>
       </div>
     </div>
+
 
     <!-- UI Overlay: Favorites List -->
     <div
@@ -956,7 +1170,11 @@
 
                   <!-- Rerun Button -->
                   <button
-                    v-if="generatedScript && !isGenerating"
+                    v-if="
+                      generatedScript &&
+                      !isGenerating &&
+                      !selectedPlace?.isCustom
+                    "
                     @click="
                       generateGuide(selectedPlace, !!generatedExtra, true)
                     "
@@ -1652,24 +1870,116 @@ const getPlaceIcon = (types: string[] = []) => {
 
 const isAddingCustomPlace = ref(false);
 const isSelectingLocation = ref(false);
+const isRecording = ref(false);
+const isTranscribing = ref(false);
+const activeRecordingTarget = ref<"description" | "detailedDescription">(
+  "description",
+);
+const mediaRecorder = ref<MediaRecorder | null>(null);
+const audioChunks = ref<Blob[]>([]);
+const recordedAudioBase64 = ref<string | null>(null);
+const recordedExtraAudioBase64 = ref<string | null>(null);
+
+const startRecording = async (
+  target: "description" | "detailedDescription" = "description",
+) => {
+  try {
+    activeRecordingTarget.value = target;
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder.value = new MediaRecorder(stream);
+    audioChunks.value = [];
+
+    mediaRecorder.value.ondataavailable = (e) => {
+      if (e.data.size > 0) audioChunks.value.push(e.data);
+    };
+
+    mediaRecorder.value.onstop = async () => {
+      const audioBlob = new Blob(audioChunks.value, { type: "audio/webm" });
+
+      // Convert to base64 for storage
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      reader.onloadend = async () => {
+        const base64 = reader.result as string;
+        if (activeRecordingTarget.value === "description") {
+          recordedAudioBase64.value = base64;
+        } else {
+          recordedExtraAudioBase64.value = base64;
+        }
+
+        // Auto-transcribe
+        isTranscribing.value = true;
+        try {
+          const formData = new FormData();
+          formData.append("file", audioBlob, "recording.webm");
+
+          const res: any = await $fetch("/api/transcribe", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (res.text) {
+            if (activeRecordingTarget.value === "description") {
+              const current = newPlaceData.value.description;
+              newPlaceData.value.description = current ? `${current} ${res.text}` : res.text;
+            } else {
+              const current = newPlaceData.value.detailedDescription;
+              newPlaceData.value.detailedDescription = current ? `${current} ${res.text}` : res.text;
+            }
+          }
+        } catch (err) {
+          console.error("[App] Transcription failed:", err);
+        } finally {
+          isTranscribing.value = false;
+        }
+      };
+    };
+
+    mediaRecorder.value.start();
+    isRecording.value = true;
+  } catch (err) {
+    console.error("[App] Could not start recording:", err);
+    error.value = "Microphone access denied.";
+  }
+};
+
+const stopRecording = () => {
+  if (mediaRecorder.value && isRecording.value) {
+    mediaRecorder.value.stop();
+    isRecording.value = false;
+    // Stop all tracks to release mic
+    mediaRecorder.value.stream.getTracks().forEach((t) => t.stop());
+  }
+};
+
 const newPlaceData = ref({
   name: "",
   address: "",
   description: "",
   detailedDescription: "",
+  useOriginalAudio: true,
   location: null as { lat: number; lng: number } | null,
 });
 
 const startAddingCustom = () => {
+  // Clear data ONLY when starting a brand new place, not when re-opening modal from selection
+  if (!isAddingCustomPlace.value) {
+    newPlaceData.value = {
+      name: "",
+      address: "",
+      description: "",
+      detailedDescription: "",
+      useOriginalAudio: true,
+      location: null,
+    };
+    recordedAudioBase64.value = null;
+    recordedExtraAudioBase64.value = null;
+  }
+  
   isAddingCustomPlace.value = true;
   isSelectingLocation.value = false;
-  newPlaceData.value = {
-    name: "",
-    address: "",
-    description: "",
-    detailedDescription: "",
-    location: null,
-  };
+  isRecording.value = false;
+  
   // Collapse sheet to give more map room
   currentSnapState.value = "peek";
   isSheetCollapsed.value = true;
@@ -1715,10 +2025,14 @@ const saveCustomPlace = () => {
   // 1. Add to official custom list
   customPlaces.value.push(customPlace);
 
-  // 2. Pre-cache the user's descriptions
+  // 2. Pre-cache the user's descriptions and original audio (only if enabled)
+  const useOriginal = newPlaceData.value.useOriginalAudio;
   guideCache.value[id] = {
     script: newPlaceData.value.description,
     extra: newPlaceData.value.detailedDescription || "",
+    audioUrl: useOriginal ? (recordedAudioBase64.value || "") : "",
+    extraAudioUrl: useOriginal ? (recordedExtraAudioBase64.value || "") : "",
+    useOriginalAudio: useOriginal,
     sources: [],
     researchData: "",
     timestamp: Date.now(),
@@ -2134,6 +2448,9 @@ const generateGuide = async (place: any, isDeepDive = false, force = false) => {
     // If it's a deep dive and we already have the extra (custom or official)
     if (isDeepDive && saved.extra) {
       generatedExtra.value = saved.extra;
+      // Trigger audio if cached
+      speakAloud("extra");
+      
       // No search needed, just scroll
       nextTick(() => {
         if (scriptScrollContainer.value) {
@@ -2281,13 +2598,21 @@ const speakAloud = async (type: "script" | "extra" = "script") => {
   activeAudioType.value = type;
 
   const cacheKey = type === "script" ? "audioUrl" : "extraAudioUrl";
+  const cachedData =
+    selectedPlace.value && guideCache.value[selectedPlace.value.id];
 
-  if (
-    selectedPlace.value &&
-    guideCache.value[selectedPlace.value.id]?.[cacheKey]
-  ) {
-    audioUrl.value = guideCache.value[selectedPlace.value.id][cacheKey];
-    return;
+  if (cachedData) {
+    // If it's a custom place AND they want original audio, use the stored base64 directly
+    if (cachedData.isCustom && cachedData.useOriginalAudio && cachedData[cacheKey]) {
+      audioUrl.value = cachedData[cacheKey];
+      return;
+    }
+    
+    // Otherwise, check for regular cached AI audio
+    if (cachedData[cacheKey]) {
+      audioUrl.value = cachedData[cacheKey];
+      return;
+    }
   }
 
   isConvertingToSpeech.value = true;
