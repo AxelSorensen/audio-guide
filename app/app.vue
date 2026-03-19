@@ -4,11 +4,13 @@
   >
     <!-- Loading Overlay (Outside ClientOnly for instant visibility) -->
     <div
-      v-if="!userPosition || !minLoadingTimerElapsed"
-      class="absolute top-[100px] inset-0 z-5 flex flex-col items-center justify-start pointer-events-auto"
+      v-if="!userPosition"
+      class="absolute inset-0 z-5 flex flex-col items-center justify-start pointer-events-auto bg-gray-50"
     >
       <!-- This container centers content in the top area (approx visible map area) -->
-      <div class="flex flex-col items-center justify-center space-y-4">
+      <div
+        class="flex flex-col items-center justify-center space-y-4 h-[40svh]"
+      >
         <div
           class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"
         ></div>
@@ -22,14 +24,6 @@
             Please allow location access to start your tour
           </p>
         </div>
-
-        <button
-          v-if="!userPosition"
-          @click="requestLocation"
-          class="mt-4 px-6 py-2.5 bg-white text-indigo-600 rounded-2xl font-bold text-xs border border-indigo-100 shadow-sm hover:bg-indigo-50 active:scale-95 transition-all uppercase tracking-widest"
-        >
-          Enable Manually
-        </button>
       </div>
     </div>
 
@@ -37,7 +31,7 @@
     <ClientOnly>
       <GoogleMap
         ref="mapRef"
-        v-if="apiKey && isMounted && minLoadingTimerElapsed"
+        v-if="apiKey && isMounted"
         :api-key="apiKey"
         class="flex-1 w-full h-full"
         :center="mapCenter"
@@ -621,7 +615,8 @@
           ? {
               transform: `translateY(${getSnapPx(currentSnapState)}px)`,
               transition: `transform ${snapDuration}ms cubic-bezier(0.34, 1.56, 0.64, 1)`,
-              borderRadius: currentSnapState === 'full' ? '0px' : '2.5rem 2.5rem 0 0',
+              borderRadius:
+                currentSnapState === 'full' ? '0px' : '2.5rem 2.5rem 0 0',
             }
           : isDragging && !isPlayingGuide
             ? {
@@ -1629,7 +1624,6 @@ const apiKey = runtimeConfig.public.googleMapsApiKey;
 
 // State
 const isMounted = ref(false);
-const minLoadingTimerElapsed = ref(false);
 const mapRef = ref<any>(null);
 const mapCenter = ref({ lat: 55.6761, lng: 12.5683 }); // Default to Copenhagen
 const mapZoom = ref(15);
@@ -1644,8 +1638,8 @@ const isSheetCollapsed = ref(false); // We'll keep this for the 'peek' state vs 
 const snapPoints = {
   full: 0,
   expanded: 40, // 40svh (60% visible)
-  peek: 90,     // 90svh (10% visible)
-  hidden: 100,  // 100svh
+  peek: 90, // 90svh (10% visible)
+  hidden: 100, // 100svh
 };
 
 const getSnapPx = (key: keyof typeof snapPoints) => {
@@ -2231,11 +2225,6 @@ const handleAudioEnd = () => {
 onMounted(async () => {
   isMounted.value = true;
 
-  // Ensure minimum 1s loading state for aesthetics
-  setTimeout(() => {
-    minLoadingTimerElapsed.value = true;
-  }, 1000);
-
   const { GridAlgorithm } = await import("@googlemaps/markerclusterer");
   clusterAlgorithm.value = new GridAlgorithm({ gridSize: 100 });
   if (!isSupported.value) {
@@ -2246,16 +2235,17 @@ onMounted(async () => {
   // Try to start automatically
   resume();
 
-  // Center map once on startup when both map and position are ready
+  // Center map once on startup when both map, position, and initial data are ready
   const stopMapWatch = watch(
-    [userPosition, () => mapRef.value?.map],
-    ([pos, map]) => {
-      if (pos && map) {
-        // Update mapCenter immediately so map loads in correct spot
+    [userPosition, () => mapRef.value?.map, isFetchingPlaces, () => places.value.length],
+    ([pos, map, fetching, placesCount]) => {
+      // We wait for:
+      // 1. Position acquired
+      // 2. Map instance exists
+      // 3. First fetch has finished OR we already have places (from cache/previous)
+      if (pos && map && !fetching && placesCount > 0) {
         mapCenter.value = { ...pos };
-        setTimeout(() => {
-          centerMap();
-        }, 300);
+        centerMap();
         stopMapWatch(); // Only do this once on startup
       }
     },
