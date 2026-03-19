@@ -472,7 +472,7 @@
 
         <!-- Actual List -->
         <div
-          v-for="place in filteredPlaces"
+          v-for="place in sortedPlaces"
           :key="place.id"
           class="bg-gray-50/50 rounded-[2rem] p-5 flex items-center justify-between hover:bg-white hover:shadow-md transition-all cursor-pointer border border-transparent hover:border-indigo-100 group"
           @click="generateGuide(place)"
@@ -498,6 +498,34 @@
                 >
                   {{ place.name }}
                 </h3>
+                <!-- New Tag -->
+                <span
+                  v-if="isCached(place.id) && !viewedPlaces[place.id]"
+                  class="ml-2 text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-black uppercase border border-blue-100 shrink-0"
+                  >New</span
+                >
+                <!-- Background Generation Spinner -->
+                <div v-if="generatingStatus[place.id]" class="ml-2">
+                  <svg
+                    class="animate-spin h-3 w-3 text-indigo-600"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      class="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      stroke-width="4"
+                      fill="none"
+                    ></circle>
+                    <path
+                      class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                </div>
               </div>
               <div class="flex items-center space-x-2 shrink-0">
                 <div
@@ -545,7 +573,7 @@
             </div>
             <div class="flex items-center space-x-2 text-left">
               <span
-                v-if="isCached(place.id)"
+                v-if="isCached(place.id) && viewedPlaces[place.id]"
                 class="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-black uppercase"
                 >Cached</span
               >
@@ -586,6 +614,12 @@
             {{ isFetchingPlaces ? "Scanning..." : "Load More" }}
           </button>
         </div>
+
+        <!-- Bottom Spacer to allow scrolling past the fold in non-full states -->
+        <div
+          :style="{ height: snapPoints[currentSnapState] + 'px' }"
+          class="flex-shrink-0"
+        ></div>
       </div>
     </div>
 
@@ -820,7 +854,7 @@
           class="flex-1 w-full bg-gray-50 rounded-[2.5rem] p-8 text-left shadow-inner border border-gray-100 overflow-y-auto relative min-h-0 no-scrollbar text-left"
         >
           <div
-            v-if="isGenerating"
+            v-if="isGenerating && !generatedScript"
             class="flex flex-col items-center justify-center h-full text-center space-y-6"
           >
             <div class="relative">
@@ -870,7 +904,10 @@
               </button>
             </div>
           </div>
-          <div v-else class="animate-in delay-150 text-left text-gray-900">
+          <div
+            v-else-if="generatedScript"
+            class="animate-in delay-150 text-left text-gray-900"
+          >
             <!-- Discovery Brief Section -->
             <div class="mb-8">
               <div class="flex justify-between items-center mb-4">
@@ -1465,9 +1502,17 @@ const currentCategoryLabel = computed(
   () => categories.find((c) => c.id === currentCategory.value)?.label,
 );
 
+const sortedPlaces = computed(() => {
+  return [...filteredPlaces.value];
+});
+
 // Local Storage for caching and favorites
 const guideCache = useLocalStorage<Record<string, any>>("audio_tour_cache", {});
 const favorites = useLocalStorage<any[]>("audio_tour_favorites", []);
+const viewedPlaces = useLocalStorage<Record<string, boolean>>(
+  "audio_tour_viewed",
+  {},
+);
 const feedbackStore = useLocalStorage<
   Record<string, { up: number; down: number; userVote?: "up" | "down" }>
 >("audio_tour_feedback", {});
@@ -1509,8 +1554,19 @@ const handleFeedback = (id: string, type: "up" | "down") => {
 const showFloatingFeedback = ref<"up" | "down" | null>(null);
 
 const selectedPlace = ref<any>(null);
-const isGenerating = ref(false);
-const isGeneratingExtra = ref(false);
+const generatingStatus = ref<Record<string, "researching" | "deep-diving">>({});
+
+const isGenerating = computed(
+  () =>
+    selectedPlace.value &&
+    generatingStatus.value[selectedPlace.value.id] === "researching",
+);
+const isGeneratingExtra = computed(
+  () =>
+    selectedPlace.value &&
+    generatingStatus.value[selectedPlace.value.id] === "deep-diving",
+);
+
 const currentAbortController = ref<AbortController | null>(null);
 
 const cancelGeneration = () => {
@@ -1520,7 +1576,9 @@ const cancelGeneration = () => {
   }
   isGenerating.value = false;
   isGeneratingExtra.value = false;
+  error.value = null; // Clear any pending error
   stopLoadingMessages();
+  closePlayer(); // Return to overview immediately
 };
 
 const isConvertingToSpeech = ref(false);
@@ -1751,6 +1809,9 @@ const toggleFavorite = (place: any) => {
 };
 
 const openSavedGuide = (saved: any) => {
+  viewedPlaces.value[saved.id] = true;
+  viewedPlaces.value = { ...viewedPlaces.value }; // Force reactivity
+
   selectedPlace.value = saved;
   generatedScript.value = saved.script || "";
   generatedExtra.value = saved.extra || "";
@@ -1760,30 +1821,52 @@ const openSavedGuide = (saved: any) => {
   activeAudioType.value = saved.audioUrl ? "script" : null;
   isPlayingGuide.value = true;
   showFavorites.value = false;
+
+  // Always trigger audio for the short description when opening
+  if (generatedScript.value) {
+    speakAloud("script");
+  }
 };
 
 const generateGuide = async (place: any, isDeepDive = false, force = false) => {
-  if (isGenerating.value || isGeneratingExtra.value) return;
-  if (!force && !isDeepDive && guideCache.value[place.id]) {
-    openSavedGuide({ ...place, ...guideCache.value[place.id] });
-    return;
-  }
+  // 1. Always open player and set selection first
   selectedPlace.value = place;
   isPlayingGuide.value = true;
 
-  if (isDeepDive) {
-    isGeneratingExtra.value = true;
-    // Scroll to show pending state
-    nextTick(() => {
-      if (scriptScrollContainer.value) {
-        scriptScrollContainer.value.scrollTo({
-          top: scriptScrollContainer.value.scrollHeight,
-          behavior: "smooth",
-        });
-      }
-    });
-  } else {
-    isGenerating.value = true;
+  // 2. Hydrate UI immediately from cache if available
+  const hasCache = !!guideCache.value[place.id];
+  if (hasCache) {
+    // If opening an already cached place, mark as viewed immediately
+    viewedPlaces.value[place.id] = true;
+    viewedPlaces.value = { ...viewedPlaces.value };
+
+    const saved = guideCache.value[place.id];
+    generatedScript.value = saved.script || "";
+    generatedExtra.value = saved.extra || "";
+    currentResearchData.value = saved.researchData || "";
+    searchLogs.value = saved.sources || [];
+    // Restore audio if we have it
+    if (saved.audioUrl) {
+      audioUrl.value = saved.audioUrl;
+      activeAudioType.value = "script";
+    }
+  }
+
+  // 3. Early return if we already have the requested data and not forcing
+  if (!force) {
+    if (!isDeepDive && hasCache && guideCache.value[place.id].script) {
+      // Even if returning early from cache, ensure audio starts
+      speakAloud("script");
+      return;
+    }
+    if (isDeepDive && hasCache && guideCache.value[place.id].extra) return;
+  }
+
+  // 4. If already generating this specific place, just let it continue
+  if (generatingStatus.value[place.id]) return;
+
+  // 4. Decide if we need to start a search
+  if (!isDeepDive && !hasCache) {
     startLoadingMessages();
     generatedScript.value = "";
     generatedExtra.value = "";
@@ -1792,6 +1875,21 @@ const generateGuide = async (place: any, isDeepDive = false, force = false) => {
     audioUrl.value = "";
     activeAudioType.value = null;
   }
+
+  if (isDeepDive) {
+    nextTick(() => {
+      if (scriptScrollContainer.value) {
+        scriptScrollContainer.value.scrollTo({
+          top: scriptScrollContainer.value.scrollHeight,
+          behavior: "smooth",
+        });
+      }
+    });
+  }
+
+  // Mark as active
+  generatingStatus.value[place.id] = isDeepDive ? "deep-diving" : "researching";
+  generatingStatus.value = { ...generatingStatus.value }; // Force reactivity
 
   // Create new AbortController
   currentAbortController.value = new AbortController();
@@ -1809,50 +1907,74 @@ const generateGuide = async (place: any, isDeepDive = false, force = false) => {
         },
         placeLocation: place.location,
         deepDive: isDeepDive,
-        researchData: currentResearchData.value, // Send existing research if available
+        researchData: isDeepDive
+          ? currentResearchData.value || guideCache.value[place.id]?.researchData
+          : "",
       },
       signal: currentAbortController.value.signal,
     });
 
-    if (isDeepDive) {
-      generatedExtra.value = res.extra || "";
-      // Append new sources if any
-      const existingUrls = new Set(searchLogs.value.map((s) => s.url));
+    // Update Cache
+    const updatedScript =
+      isDeepDive && guideCache.value[place.id]
+        ? guideCache.value[place.id].script
+        : res.script;
+    const updatedExtra = isDeepDive ? res.extra : res.extra || "";
+    const updatedResearch = res.researchData || "";
+
+    let updatedSources = res.sources || [];
+    if (isDeepDive && guideCache.value[place.id]?.sources) {
+      const existingUrls = new Set(
+        guideCache.value[place.id].sources.map((s: any) => s.url),
+      );
       const newSources = (res.sources || []).filter(
         (s: any) => !existingUrls.has(s.url),
       );
-      searchLogs.value = [...searchLogs.value, ...newSources];
-    } else {
-      generatedScript.value = res.script;
-      generatedExtra.value = res.extra || "";
-      currentResearchData.value = res.researchData || "";
-      searchLogs.value = res.sources || [];
+      updatedSources = [...guideCache.value[place.id].sources, ...newSources];
     }
 
-    guideCache.value[place.id] = {
+    const finalData = {
       ...(guideCache.value[place.id] || {}),
-      script: generatedScript.value,
-      extra: generatedExtra.value,
-      researchData: currentResearchData.value,
-      sources: searchLogs.value,
+      script: updatedScript,
+      extra: updatedExtra,
+      researchData: updatedResearch,
+      sources: updatedSources,
       timestamp: Date.now(),
     };
 
-    // Automatically trigger audio ONLY for initial script
-    if (!isDeepDive) {
-      speakAloud("script");
+    guideCache.value[place.id] = finalData;
+
+    // ONLY update UI and trigger audio if this place is STILL selected and player is open
+    if (selectedPlace.value?.id === place.id && isPlayingGuide.value) {
+      // Mark as viewed now that the data is loaded and the user is looking at it
+      viewedPlaces.value[place.id] = true;
+      viewedPlaces.value = { ...viewedPlaces.value };
+
+      generatedScript.value = updatedScript;
+      generatedExtra.value = updatedExtra;
+      currentResearchData.value = updatedResearch;
+      searchLogs.value = updatedSources;
+
+      // Always auto-play the initial script when it finishes loading
+      if (!isDeepDive) {
+        speakAloud("script");
+      }
     }
   } catch (err: any) {
-    if (err.name === "AbortError") {
-      console.log("[App] Generation cancelled by user.");
+    if (err.name === "AbortError" || err.message?.includes("abort")) {
       return;
     }
-    error.value = err.message || "Research failed.";
+    if (selectedPlace.value?.id === place.id) {
+      error.value = err.message || "Research failed.";
+    }
   } finally {
-    isGenerating.value = false;
-    isGeneratingExtra.value = false;
-    currentAbortController.value = null;
-    stopLoadingMessages();
+    delete generatingStatus.value[place.id];
+    generatingStatus.value = { ...generatingStatus.value }; // Force reactivity
+
+    if (selectedPlace.value?.id === place.id) {
+      currentAbortController.value = null;
+      stopLoadingMessages();
+    }
   }
 };
 
