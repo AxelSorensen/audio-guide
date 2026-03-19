@@ -1,12 +1,43 @@
 <template>
   <div
-    class="h-[100svh] w-screen relative overflow-hidden bg-gray-100 flex flex-col font-sans"
+    class="h-screen w-screen relative overflow-hidden bg-gray-100 flex flex-col font-sans"
   >
+    <!-- Loading Overlay (Outside ClientOnly for instant visibility) -->
+    <div
+      v-if="!userPosition || !minLoadingTimerElapsed"
+      class="absolute top-[100px] inset-0 z-5 flex flex-col items-center justify-start pointer-events-auto"
+    >
+      <!-- This container centers content in the top area (approx visible map area) -->
+      <div class="flex flex-col items-center justify-center space-y-4">
+        <div
+          class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"
+        ></div>
+        <div class="text-center px-8">
+          <p
+            class="text-indigo-600 font-black uppercase tracking-widest text-xs"
+          >
+            Acquiring Location
+          </p>
+          <p class="text-gray-400 text-[10px] mt-1 font-bold">
+            Please allow location access to start your tour
+          </p>
+        </div>
+
+        <button
+          v-if="!userPosition"
+          @click="requestLocation"
+          class="mt-4 px-6 py-2.5 bg-white text-indigo-600 rounded-2xl font-bold text-xs border border-indigo-100 shadow-sm hover:bg-indigo-50 active:scale-95 transition-all uppercase tracking-widest"
+        >
+          Enable Manually
+        </button>
+      </div>
+    </div>
+
     <!-- Map Container with vue3-google-map -->
     <ClientOnly>
       <GoogleMap
         ref="mapRef"
-        v-if="apiKey && isMounted"
+        v-if="apiKey && isMounted && minLoadingTimerElapsed"
         :api-key="apiKey"
         class="flex-1 w-full h-full"
         :center="mapCenter"
@@ -47,7 +78,7 @@
             zIndex: 1001,
             icon: {
               path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
-              fillColor: '#10b981',
+              fillColor: '#4f46e5',
               fillOpacity: 1,
               strokeWeight: 2,
               strokeColor: '#ffffff',
@@ -72,23 +103,45 @@
             :options="{
               position: place.location,
               anchorPoint: 'BOTTOM_CENTER',
+              zIndex:
+                isPlayingGuide && selectedPlace?.id === place.id ? 1000 : 1,
             }"
             @click="generateGuide(place)"
           >
-            <div class="flex flex-col items-center group">
+            <div
+              class="flex flex-col items-center group transition-transform"
+              :class="{
+                'scale-125': isPlayingGuide && selectedPlace?.id === place.id,
+              }"
+            >
               <!-- Bubble -->
               <div
-                class="bg-white rounded-full px-3 py-1.5 shadow-xl border border-gray-100 group-hover:scale-110 transition-transform cursor-pointer relative z-10"
+                class="rounded-full px-3 py-1.5 shadow-xl border transition-all cursor-pointer relative z-10"
+                :class="
+                  isPlayingGuide && selectedPlace?.id === place.id
+                    ? 'bg-indigo-600 border-indigo-500'
+                    : 'bg-white border-gray-100 group-hover:scale-110'
+                "
               >
                 <span
-                  class="text-[10px] font-black text-indigo-600 truncate max-w-[120px] uppercase tracking-tighter"
+                  class="text-[10px] font-black truncate max-w-[120px] uppercase tracking-tighter"
+                  :class="
+                    isPlayingGuide && selectedPlace?.id === place.id
+                      ? 'text-white'
+                      : 'text-indigo-600'
+                  "
                 >
                   {{ place.name }}
                 </span>
               </div>
               <!-- Pin Tail -->
               <div
-                class="w-2.5 h-2.5 bg-white border-r border-b border-gray-100 rotate-45 -mt-1.5 shadow-sm"
+                class="w-2.5 h-2.5 border-r border-b rotate-45 -mt-1.5 shadow-sm"
+                :class="
+                  isPlayingGuide && selectedPlace?.id === place.id
+                    ? 'bg-indigo-600 border-indigo-500'
+                    : 'bg-white border-gray-100'
+                "
               ></div>
             </div>
           </CustomMarker>
@@ -126,36 +179,13 @@
         </div>
 
         <div class="flex flex-col space-y-2 pointer-events-auto">
-          <!-- Manual Location Request Button -->
           <button
-            v-if="!userPosition"
-            @click="requestLocation"
-            class="bg-indigo-600 p-3 rounded-full shadow-lg text-white hover:bg-indigo-700 transition-all hover:scale-110 active:scale-95 animate-bounce"
-            title="Enable Location"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-              <circle cx="12" cy="10" r="3" />
-            </svg>
-          </button>
-
-          <button
-            v-if="userPosition"
-            @click="centerMap"
+            @click="userPosition ? centerMap() : requestLocation()"
             class="bg-white p-3 rounded-full shadow-lg text-indigo-600 hover:bg-indigo-50 transition-all hover:scale-110 active:scale-95 border border-gray-100"
             title="Center on my location"
           >
             <svg
+              v-if="userPosition"
               xmlns="http://www.w3.org/2000/svg"
               width="24"
               height="24"
@@ -168,10 +198,29 @@
             >
               <polygon points="3 11 22 2 13 21 11 13 3 11" />
             </svg>
+            <!-- Loading state icon if we don't have position yet -->
+            <svg
+              v-else
+              class="animate-spin"
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
           </button>
 
           <button
-            @click="currentCategory = currentCategory === 'favorites' ? 'all' : 'favorites'"
+            @click="
+              currentCategory =
+                currentCategory === 'favorites' ? 'all' : 'favorites'
+            "
             class="p-3 rounded-full shadow-lg transition-all hover:scale-110 active:scale-95 border border-gray-100"
             :class="
               currentCategory === 'favorites'
@@ -265,7 +314,9 @@
               </label>
               <!-- Record/Stop Button -->
               <button
-                @click.stop="isRecording ? stopRecording() : startRecording('description')"
+                @click.stop="
+                  isRecording ? stopRecording() : startRecording('description')
+                "
                 class="flex items-center space-x-1.5 px-2 py-1 rounded-lg transition-all active:scale-95"
                 :class="
                   isRecording && activeRecordingTarget === 'description'
@@ -296,14 +347,18 @@
                   <line x1="12" x2="12" y1="19" y2="22" />
                 </svg>
                 <span class="text-[9px] font-black uppercase">{{
-                  isRecording && activeRecordingTarget === "description" ? "Stop Recording" : "Record"
+                  isRecording && activeRecordingTarget === "description"
+                    ? "Stop Recording"
+                    : "Record"
                 }}</span>
               </button>
             </div>
             <div class="relative">
               <textarea
                 v-model="newPlaceData.description"
-                :disabled="isTranscribing && activeRecordingTarget === 'description'"
+                :disabled="
+                  isTranscribing && activeRecordingTarget === 'description'
+                "
                 placeholder="Type or record your story..."
                 class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all h-14 resize-none disabled:opacity-50"
               ></textarea>
@@ -499,7 +554,7 @@
             class="p-3 rounded-xl border-2 border-dashed text-center cursor-pointer transition-all flex-shrink-0"
             :class="
               newPlaceData.location
-                ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
                 : 'bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100'
             "
           >
@@ -511,7 +566,7 @@
             </p>
             <p
               v-else
-              class="text-xs font-black text-green-600 uppercase tracking-wide flex items-center justify-center space-x-2"
+              class="text-xs font-black text-blue-600 uppercase tracking-wide flex items-center justify-center space-x-2"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -553,7 +608,6 @@
       </div>
     </div>
 
-
     <!-- UI Overlay: Bottom Sheet for Places -->
     <div
       class="absolute bottom-0 left-0 right-0 bg-white shadow-[0_-8px_30px_rgba(0,0,0,0.12)] z-20 h-[100svh] flex flex-col border-t border-gray-100 will-change-transform"
@@ -567,7 +621,8 @@
           ? {
               transform: `translateY(${snapPoints[currentSnapState]}px)`,
               transition: `transform ${snapDuration}ms cubic-bezier(0.34, 1.56, 0.64, 1)`,
-              borderRadius: currentSnapState === 'full' ? '0px' : '2.5rem 2.5rem 0 0',
+              borderRadius:
+                currentSnapState === 'full' ? '0px' : '2.5rem 2.5rem 0 0',
             }
           : isDragging && !isPlayingGuide
             ? {
@@ -578,7 +633,6 @@
             : {}
       "
     >
-
       <!-- Draggable Header Section (Handle + Title + Filters) -->
       <div
         class="w-full flex-shrink-0 cursor-grab active:cursor-grabbing touch-none bg-white"
@@ -706,24 +760,24 @@
       </div>
 
       <div class="overflow-y-auto px-6 pb-6 space-y-4 flex-1 no-scrollbar">
-        <!-- Skeleton Loaders -->
-        <template v-if="isFetchingPlaces && filteredPlaces.length === 0">
+        <!-- Skeleton Loaders (Initial & Infinite) -->
+        <template v-if="isFetchingPlaces">
           <div
-            v-for="i in 3"
-            :key="i"
-            class="bg-gray-50/50 rounded-[2rem] p-5 flex items-center justify-between animate-pulse"
+            v-for="i in filteredPlaces.length === 0 ? 3 : 1"
+            :key="'skeleton-' + i"
+            class="bg-gray-50/50 rounded-[2rem] p-5 flex items-center justify-between animate-pulse border border-dashed border-gray-100"
           >
             <div class="flex-1 pr-4 text-left">
               <div class="h-5 bg-gray-200 rounded-full w-3/4 mb-3"></div>
               <div class="h-3 bg-gray-100 rounded-full w-1/2"></div>
             </div>
-            <div class="w-12 h-12 rounded-2xl bg-gray-100"></div>
+            <div class="w-12 h-12 rounded-2xl bg-gray-100/50"></div>
           </div>
         </template>
 
-        <!-- No Results -->
+        <!-- No Results (Only when NOT fetching) -->
         <div
-          v-else-if="filteredPlaces.length === 0 && !isFetchingPlaces"
+          v-if="filteredPlaces.length === 0 && !isFetchingPlaces"
           class="text-center text-gray-400 py-12 flex flex-col items-center"
         >
           <svg
@@ -1576,6 +1630,7 @@ const apiKey = runtimeConfig.public.googleMapsApiKey;
 
 // State
 const isMounted = ref(false);
+const minLoadingTimerElapsed = ref(false);
 const mapRef = ref<any>(null);
 const mapCenter = ref({ lat: 55.6761, lng: 12.5683 }); // Default to Copenhagen
 const mapZoom = ref(15);
@@ -1583,6 +1638,7 @@ const userPosition = ref<{ lat: number; lng: number } | null>(null);
 const error = ref<string | null>(null);
 const places = ref<any[]>([]);
 const isFetchingPlaces = ref(false);
+const showFavorites = ref(false);
 const isSheetCollapsed = ref(false); // We'll keep this for the 'peek' state vs 'expanded/full'
 
 // 3-State Draggable Sheet Logic
@@ -1825,10 +1881,14 @@ const startRecording = async (
           if (res.text) {
             if (activeRecordingTarget.value === "description") {
               const current = newPlaceData.value.description;
-              newPlaceData.value.description = current ? `${current} ${res.text}` : res.text;
+              newPlaceData.value.description = current
+                ? `${current} ${res.text}`
+                : res.text;
             } else {
               const current = newPlaceData.value.detailedDescription;
-              newPlaceData.value.detailedDescription = current ? `${current} ${res.text}` : res.text;
+              newPlaceData.value.detailedDescription = current
+                ? `${current} ${res.text}`
+                : res.text;
             }
           }
         } catch (err) {
@@ -1879,11 +1939,11 @@ const startAddingCustom = () => {
     recordedAudioBase64.value = null;
     recordedExtraAudioBase64.value = null;
   }
-  
+
   isAddingCustomPlace.value = true;
   isSelectingLocation.value = false;
   isRecording.value = false;
-  
+
   // Collapse sheet to give more map room
   currentSnapState.value = "peek";
   isSheetCollapsed.value = true;
@@ -1928,14 +1988,15 @@ const saveCustomPlace = () => {
 
   // 1. Add to official custom list
   customPlaces.value.push(customPlace);
+  customPlaces.value = [...customPlaces.value]; // Force reactivity for useLocalStorage if needed
 
   // 2. Pre-cache the user's descriptions and original audio (only if enabled)
   const useOriginal = newPlaceData.value.useOriginalAudio;
   guideCache.value[id] = {
     script: newPlaceData.value.description,
     extra: newPlaceData.value.detailedDescription || "",
-    audioUrl: useOriginal ? (recordedAudioBase64.value || "") : "",
-    extraAudioUrl: useOriginal ? (recordedExtraAudioBase64.value || "") : "",
+    audioUrl: useOriginal ? recordedAudioBase64.value || "" : "",
+    extraAudioUrl: useOriginal ? recordedExtraAudioBase64.value || "" : "",
     useOriginalAudio: useOriginal,
     sources: [],
     researchData: "",
@@ -1981,11 +2042,8 @@ const filteredPlaces = computed(() => {
   );
 });
 
-// Markers specifically for the map (allows showing only the active one)
+// Markers specifically for the map
 const mapPlaces = computed(() => {
-  if (isPlayingGuide.value && selectedPlace.value) {
-    return [selectedPlace.value];
-  }
   return filteredPlaces.value;
 });
 
@@ -2174,6 +2232,12 @@ const handleAudioEnd = () => {
 // Initialize
 onMounted(async () => {
   isMounted.value = true;
+
+  // Ensure minimum 1s loading state for aesthetics
+  setTimeout(() => {
+    minLoadingTimerElapsed.value = true;
+  }, 1000);
+
   const { GridAlgorithm } = await import("@googlemaps/markerclusterer");
   clusterAlgorithm.value = new GridAlgorithm({ gridSize: 100 });
   if (!isSupported.value) {
@@ -2189,9 +2253,11 @@ onMounted(async () => {
     [userPosition, () => mapRef.value?.map],
     ([pos, map]) => {
       if (pos && map) {
+        // Update mapCenter immediately so map loads in correct spot
+        mapCenter.value = { ...pos };
         setTimeout(() => {
           centerMap();
-        }, 500);
+        }, 300);
         stopMapWatch(); // Only do this once on startup
       }
     },
@@ -2327,7 +2393,11 @@ const generateGuide = async (place: any, isDeepDive = false, force = false) => {
   selectedPlace.value = place;
   isPlayingGuide.value = true;
 
-  // 2. Hydrate UI immediately from cache if available
+  // 2. Clear state if we are switching to a new place or it's a fresh search
+  const isNewPlace =
+    !selectedPlace.value || selectedPlace.value.id !== place.id;
+
+  // 3. Hydrate UI immediately from cache if available
   const hasCache = !!guideCache.value[place.id];
   if (hasCache) {
     // If opening an already cached place, mark as viewed immediately
@@ -2336,35 +2406,52 @@ const generateGuide = async (place: any, isDeepDive = false, force = false) => {
 
     const saved = guideCache.value[place.id];
     generatedScript.value = saved.script || "";
-    // Hide extra for custom places initially
+    // Hide extra for custom places initially unless it's a deep dive
     if (!isDeepDive) {
       generatedExtra.value = saved.isCustom ? "" : saved.extra || "";
     }
 
     currentResearchData.value = saved.researchData || "";
     searchLogs.value = saved.sources || [];
-    // Restore audio if we have it
+
+    // Restore audio if we have it, otherwise CLEAR it so we don't show previous place's audio
     if (saved.audioUrl) {
       audioUrl.value = saved.audioUrl;
       activeAudioType.value = "script";
+    } else {
+      audioUrl.value = "";
+      activeAudioType.value = null;
     }
+  } else {
+    // No cache: reset everything
+    generatedScript.value = "";
+    generatedExtra.value = "";
+    currentResearchData.value = "";
+    searchLogs.value = [];
+    audioUrl.value = "";
+    activeAudioType.value = null;
   }
 
-  // 3. Early return if we already have the requested data and not forcing
+  // 4. Early return if we already have the requested data and not forcing
   if (!force && hasCache) {
     const saved = guideCache.value[place.id];
 
-    if (!isDeepDive && saved.script) {
-      speakAloud("script");
+    // For custom places, we NEVER search for the initial script if it's already there
+    if (!isDeepDive && (saved.script || saved.isCustom)) {
+      if (saved.script) speakAloud("script");
       return;
     }
 
     // If it's a deep dive and we already have the extra (custom or official)
     if (isDeepDive && saved.extra) {
       generatedExtra.value = saved.extra;
-      // Trigger audio if cached
+      // Restore extra audio if available
+      if (saved.extraAudioUrl) {
+        audioUrl.value = saved.extraAudioUrl;
+        activeAudioType.value = "extra";
+      }
       speakAloud("extra");
-      
+
       // No search needed, just scroll
       nextTick(() => {
         if (scriptScrollContainer.value) {
@@ -2376,20 +2463,22 @@ const generateGuide = async (place: any, isDeepDive = false, force = false) => {
       });
       return;
     }
+
+    // For custom places specifically: if we are in deep dive but have no extra,
+    // we should only search if the user didn't explicitly provide an extra description already.
+    // However, if it's a custom place, we generally want to avoid searching unless forced.
+    if (isDeepDive && saved.isCustom && !force) {
+      // If it's custom and we don't have extra, just stay here
+      return;
+    }
   }
 
-  // 4. If already generating this specific place, just let it continue
+  // 5. If already generating this specific place, just let it continue
   if (generatingStatus.value[place.id]) return;
 
-  // 4. Decide if we need to start a search
+  // 6. Decide if we need to start a search
   if (!isDeepDive && !hasCache) {
     startLoadingMessages();
-    generatedScript.value = "";
-    generatedExtra.value = "";
-    currentResearchData.value = "";
-    searchLogs.value = [];
-    audioUrl.value = "";
-    activeAudioType.value = null;
   }
 
   if (isDeepDive) {
@@ -2517,11 +2606,15 @@ const speakAloud = async (type: "script" | "extra" = "script") => {
 
   if (cachedData) {
     // If it's a custom place AND they want original audio, use the stored base64 directly
-    if (cachedData.isCustom && cachedData.useOriginalAudio && cachedData[cacheKey]) {
+    if (
+      cachedData.isCustom &&
+      cachedData.useOriginalAudio &&
+      cachedData[cacheKey]
+    ) {
       audioUrl.value = cachedData[cacheKey];
       return;
     }
-    
+
     // Otherwise, check for regular cached AI audio
     if (cachedData[cacheKey]) {
       audioUrl.value = cachedData[cacheKey];
