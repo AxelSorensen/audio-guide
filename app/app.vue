@@ -15,7 +15,11 @@
         :gesture-handling="'greedy'"
         :styles="mapStyles"
         :map-id="'bf1cf3607cc60027'"
-        @click="isSheetCollapsed = true"
+        @click="
+          isSelectingLocation
+            ? handleMapClickForCustom($event)
+            : (isSheetCollapsed = true)
+        "
       >
         <!-- Modern User Marker (Standard Marker for stability) -->
         <Marker
@@ -35,6 +39,24 @@
           }"
         />
 
+        <!-- Temporary Custom Marker -->
+        <Marker
+          v-if="isAddingCustomPlace && newPlaceData.location"
+          :options="{
+            position: newPlaceData.location,
+            zIndex: 1001,
+            icon: {
+              path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
+              fillColor: '#10b981',
+              fillOpacity: 1,
+              strokeWeight: 2,
+              strokeColor: '#ffffff',
+              scale: 1.5,
+              anchor: { x: 12, y: 22 },
+            },
+          }"
+        />
+
         <!-- Clustered Modern Markers -->
         <MarkerCluster
           v-if="clusterAlgorithm"
@@ -44,6 +66,7 @@
           }"
         >
           <CustomMarker
+            class="-top-8"
             v-for="place in filteredPlaces"
             :key="place.id"
             :options="{
@@ -98,7 +121,7 @@
           <p
             class="text-[10px] uppercase tracking-widest text-gray-400 font-bold"
           >
-            Evidence-Based Discovery
+            Every City Has a Story
           </p>
         </div>
 
@@ -173,6 +196,145 @@
                 d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"
               />
             </svg>
+          </button>
+
+          <!-- Add Custom Place Button -->
+          <button
+            @click="startAddingCustom"
+            class="bg-white p-3 rounded-full shadow-lg text-green-600 hover:bg-green-50 transition-all hover:scale-110 active:scale-95 border border-gray-100"
+            title="Add Custom Location"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 5v12" />
+              <path d="M5 12h14" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- UI Overlay: Add Custom Location Dialog -->
+    <div
+      v-if="isAddingCustomPlace && !isSelectingLocation"
+      class="absolute inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/5"
+    >
+      <div
+        class="bg-white w-full max-w-md rounded-[2.5rem] p-6 shadow-2xl border border-indigo-50 flex flex-col max-h-[85svh] animate-in"
+      >
+        <div class="text-center mb-6 flex-shrink-0">
+          <h2 class="text-2xl font-black text-gray-900">Add Custom Place</h2>
+          <p
+            class="text-sm font-bold text-gray-400 mt-1 uppercase tracking-wider"
+          >
+            Share a hidden story
+          </p>
+        </div>
+
+        <div class="space-y-3 flex-1 pb-4">
+          <div>
+            <label
+              class="block text-[10px] font-black uppercase text-indigo-400 mb-1 ml-1"
+            >
+              Name
+            </label>
+            <input
+              v-model="newPlaceData.name"
+              type="text"
+              placeholder="Name of the place..."
+              class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+            />
+          </div>
+
+          <div>
+            <label
+              class="block text-[10px] font-black uppercase text-indigo-400 mb-1 ml-1"
+            >
+              Brief Description
+            </label>
+            <textarea
+              v-model="newPlaceData.description"
+              placeholder="A short summary..."
+              class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all h-14 resize-none"
+            ></textarea>
+          </div>
+
+          <div>
+            <label
+              class="block text-[10px] font-black uppercase text-indigo-400 mb-1 ml-1"
+            >
+              Detailed Guide (Optional)
+            </label>
+            <textarea
+              v-model="newPlaceData.detailedDescription"
+              placeholder="Tell the full story..."
+              class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all h-20 resize-none"
+            ></textarea>
+          </div>
+
+          <div
+            @click="startLocationSelection"
+            class="p-3 rounded-xl border-2 border-dashed text-center cursor-pointer transition-all flex-shrink-0"
+            :class="
+              newPlaceData.location
+                ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                : 'bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100'
+            "
+          >
+            <p
+              v-if="!newPlaceData.location"
+              class="text-xs font-black text-indigo-600 uppercase tracking-wide"
+            >
+              Click to select location on map
+            </p>
+            <p
+              v-else
+              class="text-xs font-black text-green-600 uppercase tracking-wide flex items-center justify-center space-x-2"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              <span>Location Set! (click to reset)</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="flex space-x-3 pt-4 border-t border-gray-50 flex-shrink-0">
+          <button
+            @click="cancelAddingCustom"
+            class="flex-1 bg-gray-100 text-gray-500 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            @click="saveCustomPlace"
+            :disabled="
+              !newPlaceData.name ||
+              !newPlaceData.description ||
+              !newPlaceData.location
+            "
+            class="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-100"
+          >
+            Save Place
           </button>
         </div>
       </div>
@@ -301,7 +463,8 @@
           ? {
               transform: `translateY(${snapPoints[currentSnapState]}px)`,
               transition: `transform ${snapDuration}ms cubic-bezier(0.34, 1.56, 0.64, 1)`,
-              borderRadius: currentSnapState === 'full' ? '0px' : '2.5rem 2.5rem 0 0',
+              borderRadius:
+                currentSnapState === 'full' ? '0px' : '2.5rem 2.5rem 0 0',
             }
           : isDragging && !isPlayingGuide && !showFavorites
             ? {
@@ -794,7 +957,9 @@
                   <!-- Rerun Button -->
                   <button
                     v-if="generatedScript && !isGenerating"
-                    @click="generateGuide(selectedPlace, !!generatedExtra, true)"
+                    @click="
+                      generateGuide(selectedPlace, !!generatedExtra, true)
+                    "
                     class="p-2.5 bg-gray-50 text-gray-400 rounded-xl hover:bg-gray-100 hover:text-gray-600 transition-all active:scale-95"
                     title="Regenerate Research"
                   >
@@ -993,7 +1158,9 @@
                 !generatedExtra &&
                 !isGenerating &&
                 !isGeneratingExtra &&
-                generatedScript
+                generatedScript &&
+                (!selectedPlace?.isCustom ||
+                  (selectedPlace?.id && guideCache[selectedPlace.id]?.extra))
               "
               class="mb-8 animate-in"
             >
@@ -1298,7 +1465,9 @@ const showFavorites = ref(false);
 const isSheetCollapsed = ref(false); // We'll keep this for the 'peek' state vs 'expanded/full'
 
 // 3-State Draggable Sheet Logic
-const sheetHeight = computed(() => (typeof window !== "undefined" ? window.innerHeight : 0));
+const sheetHeight = computed(() =>
+  typeof window !== "undefined" ? window.innerHeight : 0,
+);
 const snapPoints = computed(() => {
   const h = sheetHeight.value;
   return {
@@ -1363,7 +1532,9 @@ const onDragEnd = (e: TouchEvent | MouseEvent) => {
 
   const duration = Date.now() - startTime.value;
   const clientY =
-    "changedTouches" in e ? e.changedTouches[0].clientY : (e as MouseEvent).clientY;
+    "changedTouches" in e
+      ? e.changedTouches[0].clientY
+      : (e as MouseEvent).clientY;
   const deltaY = clientY - startTouchY.value;
   const velocity = deltaY / duration; // px/ms
 
@@ -1433,6 +1604,7 @@ const categories = [
   { id: "history", label: "History" },
   { id: "culture", label: "Culture" },
   { id: "nature", label: "Nature" },
+  { id: "custom", label: "Custom" },
 ];
 
 const mapStyles = [
@@ -1478,17 +1650,108 @@ const getPlaceIcon = (types: string[] = []) => {
   return "default";
 };
 
+const isAddingCustomPlace = ref(false);
+const isSelectingLocation = ref(false);
+const newPlaceData = ref({
+  name: "",
+  address: "",
+  description: "",
+  detailedDescription: "",
+  location: null as { lat: number; lng: number } | null,
+});
+
+const startAddingCustom = () => {
+  isAddingCustomPlace.value = true;
+  isSelectingLocation.value = false;
+  newPlaceData.value = {
+    name: "",
+    address: "",
+    description: "",
+    detailedDescription: "",
+    location: null,
+  };
+  // Collapse sheet to give more map room
+  currentSnapState.value = "peek";
+  isSheetCollapsed.value = true;
+};
+
+const startLocationSelection = () => {
+  isSelectingLocation.value = true;
+};
+
+const handleMapClickForCustom = (e: any) => {
+  if (!isSelectingLocation.value) return;
+  if (e.latLng) {
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+    newPlaceData.value.location = { lat, lng };
+    newPlaceData.value.address = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+
+    // Return to modal after a brief delay so user can see the marker
+    setTimeout(() => {
+      isSelectingLocation.value = false;
+    }, 500);
+  }
+};
+
+const saveCustomPlace = () => {
+  if (
+    !newPlaceData.value.name ||
+    !newPlaceData.value.description ||
+    !newPlaceData.value.location
+  )
+    return;
+
+  const id = `custom-${Date.now()}`;
+  const customPlace = {
+    id,
+    name: newPlaceData.value.name,
+    vicinity: newPlaceData.value.address || "Custom Location",
+    location: newPlaceData.value.location,
+    types: ["custom_place"],
+    isCustom: true,
+  };
+
+  // 1. Add to official custom list
+  customPlaces.value.push(customPlace);
+
+  // 2. Pre-cache the user's descriptions
+  guideCache.value[id] = {
+    script: newPlaceData.value.description,
+    extra: newPlaceData.value.detailedDescription || "",
+    sources: [],
+    researchData: "",
+    timestamp: Date.now(),
+    isCustom: true,
+  };
+
+  isAddingCustomPlace.value = false;
+
+  // 3. Open it immediately (will now hydrate from cache instantly)
+  openSavedGuide({ ...customPlace, ...guideCache.value[id] });
+};
+
+const cancelAddingCustom = () => {
+  isAddingCustomPlace.value = false;
+};
+
 const clusterAlgorithm = ref<any | null>(null);
 
 // Computed Filtered List
 const filteredPlaces = computed(() => {
-  let list = places.value;
-  if (currentCategory.value !== "all") {
+  // Combine official places with custom places
+  let list = [...places.value, ...customPlaces.value];
+
+  if (currentCategory.value === "custom") {
+    list = list.filter((p) => p.isCustom);
+  } else if (currentCategory.value !== "all") {
     const allowed = categoryTypes[currentCategory.value] || [];
-    list = list.filter((p) =>
-      (p.types || []).some((t: string) => allowed.includes(t)),
+    list = list.filter(
+      (p) =>
+        p.isCustom || (p.types || []).some((t: string) => allowed.includes(t)),
     );
   }
+
   // Crucial: Filter out any places without valid coordinates to prevent crashes in Google Maps / Clusterer
   return list.filter(
     (p) =>
@@ -1513,6 +1776,7 @@ const viewedPlaces = useLocalStorage<Record<string, boolean>>(
   "audio_tour_viewed",
   {},
 );
+const customPlaces = useLocalStorage<any[]>("audio_tour_custom", []);
 const feedbackStore = useLocalStorage<
   Record<string, { up: number; down: number; userVote?: "up" | "down" }>
 >("audio_tour_feedback", {});
@@ -1814,7 +2078,9 @@ const openSavedGuide = (saved: any) => {
 
   selectedPlace.value = saved;
   generatedScript.value = saved.script || "";
-  generatedExtra.value = saved.extra || "";
+  // Don't show extra for custom places initially so they can click "Tell me more"
+  generatedExtra.value = saved.isCustom ? "" : saved.extra || "";
+
   currentResearchData.value = saved.researchData || "";
   searchLogs.value = saved.sources || [];
   audioUrl.value = saved.audioUrl || "";
@@ -1842,7 +2108,11 @@ const generateGuide = async (place: any, isDeepDive = false, force = false) => {
 
     const saved = guideCache.value[place.id];
     generatedScript.value = saved.script || "";
-    generatedExtra.value = saved.extra || "";
+    // Hide extra for custom places initially
+    if (!isDeepDive) {
+      generatedExtra.value = saved.isCustom ? "" : saved.extra || "";
+    }
+
     currentResearchData.value = saved.researchData || "";
     searchLogs.value = saved.sources || [];
     // Restore audio if we have it
@@ -1853,13 +2123,28 @@ const generateGuide = async (place: any, isDeepDive = false, force = false) => {
   }
 
   // 3. Early return if we already have the requested data and not forcing
-  if (!force) {
-    if (!isDeepDive && hasCache && guideCache.value[place.id].script) {
-      // Even if returning early from cache, ensure audio starts
+  if (!force && hasCache) {
+    const saved = guideCache.value[place.id];
+
+    if (!isDeepDive && saved.script) {
       speakAloud("script");
       return;
     }
-    if (isDeepDive && hasCache && guideCache.value[place.id].extra) return;
+
+    // If it's a deep dive and we already have the extra (custom or official)
+    if (isDeepDive && saved.extra) {
+      generatedExtra.value = saved.extra;
+      // No search needed, just scroll
+      nextTick(() => {
+        if (scriptScrollContainer.value) {
+          scriptScrollContainer.value.scrollTo({
+            top: scriptScrollContainer.value.scrollHeight,
+            behavior: "smooth",
+          });
+        }
+      });
+      return;
+    }
   }
 
   // 4. If already generating this specific place, just let it continue
@@ -1908,7 +2193,8 @@ const generateGuide = async (place: any, isDeepDive = false, force = false) => {
         placeLocation: place.location,
         deepDive: isDeepDive,
         researchData: isDeepDive
-          ? currentResearchData.value || guideCache.value[place.id]?.researchData
+          ? currentResearchData.value ||
+            guideCache.value[place.id]?.researchData
           : "",
       },
       signal: currentAbortController.value.signal,
