@@ -1,6 +1,6 @@
 <template>
   <div
-    class="h-screen w-screen relative overflow-hidden bg-gray-100 flex flex-col font-sans"
+    class="h-svh w-screen relative overflow-hidden bg-gray-100 flex flex-col font-sans"
   >
     <!-- Loading Overlay (Outside ClientOnly for instant visibility) -->
     <div
@@ -619,10 +619,9 @@
       :style="
         !isDragging && !isPlayingGuide
           ? {
-              transform: `translateY(${snapPoints[currentSnapState]}px)`,
+              transform: `translateY(${getSnapPx(currentSnapState)}px)`,
               transition: `transform ${snapDuration}ms cubic-bezier(0.34, 1.56, 0.64, 1)`,
-              borderRadius:
-                currentSnapState === 'full' ? '0px' : '2.5rem 2.5rem 0 0',
+              borderRadius: currentSnapState === 'full' ? '0px' : '2.5rem 2.5rem 0 0',
             }
           : isDragging && !isPlayingGuide
             ? {
@@ -1642,18 +1641,17 @@ const showFavorites = ref(false);
 const isSheetCollapsed = ref(false); // We'll keep this for the 'peek' state vs 'expanded/full'
 
 // 3-State Draggable Sheet Logic
-const sheetHeight = computed(() =>
-  typeof window !== "undefined" ? window.innerHeight : 0,
-);
-const snapPoints = computed(() => {
-  const h = sheetHeight.value;
-  return {
-    full: 0,
-    expanded: h * 0.4, // 60% visible (100 - 60 = 40)
-    peek: h * 0.9, // 10% visible (100 - 10 = 90)
-    hidden: h,
-  };
-});
+const snapPoints = {
+  full: 0,
+  expanded: 40, // 40svh (60% visible)
+  peek: 90,     // 90svh (10% visible)
+  hidden: 100,  // 100svh
+};
+
+const getSnapPx = (key: keyof typeof snapPoints) => {
+  if (typeof window === "undefined") return 0;
+  return (window.innerHeight * snapPoints[key]) / 100;
+};
 
 const currentSnapState = ref<"peek" | "expanded" | "full">("expanded");
 const isDragging = ref(false);
@@ -1671,7 +1669,7 @@ const onDragStart = (e: TouchEvent | MouseEvent) => {
   startTouchY.value = clientY;
 
   // Calculate current Y based on state
-  startSheetY.value = snapPoints.value[currentSnapState.value];
+  startSheetY.value = getSnapPx(currentSnapState.value);
   dragY.value = startSheetY.value;
 
   window.addEventListener("touchmove", onDragMove, { passive: false });
@@ -1687,15 +1685,17 @@ const onDragMove = (e: TouchEvent | MouseEvent) => {
   let newY = startSheetY.value + delta;
 
   // Rubber-banding / Resistance at edges
-  const points = snapPoints.value;
-  if (newY < points.full) {
-    newY = points.full + (newY - points.full) * 0.15;
-  } else if (newY > points.peek) {
-    newY = points.peek + (newY - points.peek) * 0.15;
+  const fullPx = getSnapPx("full");
+  const peekPx = getSnapPx("peek");
+
+  if (newY < fullPx) {
+    newY = fullPx + (newY - fullPx) * 0.15;
+  } else if (newY > peekPx) {
+    newY = peekPx + (newY - peekPx) * 0.15;
   }
 
   // Final constrain for absolute safety
-  const h = sheetHeight.value;
+  const h = typeof window !== "undefined" ? window.innerHeight : 0;
   if (newY < -50) newY = -50;
   if (newY > h + 50) newY = h + 50;
 
@@ -1715,9 +1715,7 @@ const onDragEnd = (e: TouchEvent | MouseEvent) => {
   const deltaY = clientY - startTouchY.value;
   const velocity = deltaY / duration; // px/ms
 
-  const points = snapPoints.value;
   const currentY = dragY.value;
-
   let targetState = currentSnapState.value;
 
   // If flicked with enough velocity, jump to next/prev state
@@ -1736,16 +1734,16 @@ const onDragEnd = (e: TouchEvent | MouseEvent) => {
   } else {
     // Normal distance-based snapping
     const distances = [
-      { state: "full", dist: Math.abs(currentY - points.full) },
-      { state: "expanded", dist: Math.abs(currentY - points.expanded) },
-      { state: "peek", dist: Math.abs(currentY - points.peek) },
+      { state: "full", dist: Math.abs(currentY - getSnapPx("full")) },
+      { state: "expanded", dist: Math.abs(currentY - getSnapPx("expanded")) },
+      { state: "peek", dist: Math.abs(currentY - getSnapPx("peek")) },
     ];
     distances.sort((a, b) => a.dist - b.dist);
     targetState = distances[0].state as any;
   }
 
   // Calculate a natural-feeling duration based on velocity or distance
-  const targetY = points[targetState];
+  const targetY = getSnapPx(targetState);
   const distance = Math.abs(currentY - targetY);
   const calculatedDuration = Math.max(
     250,
