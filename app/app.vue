@@ -67,7 +67,7 @@
         >
           <CustomMarker
             class="-top-8"
-            v-for="place in filteredPlaces"
+            v-for="place in mapPlaces"
             :key="place.id"
             :options="{
               position: place.location,
@@ -171,14 +171,14 @@
           </button>
 
           <button
-            @click="showFavorites = !showFavorites"
+            @click="currentCategory = currentCategory === 'favorites' ? 'all' : 'favorites'"
             class="p-3 rounded-full shadow-lg transition-all hover:scale-110 active:scale-95 border border-gray-100"
             :class="
-              showFavorites
+              currentCategory === 'favorites'
                 ? 'bg-indigo-600 text-white'
                 : 'bg-white text-gray-600'
             "
-            title="Favorites"
+            title="Filter Favorites"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -190,7 +190,7 @@
               stroke-width="2.5"
               stroke-linecap="round"
               stroke-linejoin="round"
-              :fill="showFavorites ? 'currentColor' : 'none'"
+              :fill="currentCategory === 'favorites' ? 'currentColor' : 'none'"
             >
               <path
                 d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"
@@ -554,133 +554,22 @@
     </div>
 
 
-    <!-- UI Overlay: Favorites List -->
-    <div
-      v-if="showFavorites"
-      class="absolute inset-0 bg-white/95 backdrop-blur-md z-40 p-8 flex flex-col animate-in"
-    >
-      <div class="flex justify-between items-center mb-8">
-        <h2 class="text-3xl font-black text-gray-900 text-left">
-          Your Favorites
-        </h2>
-        <button
-          @click="showFavorites = false"
-          class="p-3 bg-gray-100 rounded-2xl text-gray-500 hover:bg-gray-200"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </button>
-      </div>
-      <div class="flex-1 overflow-y-auto space-y-4 no-scrollbar">
-        <div
-          v-if="favorites.length === 0"
-          class="text-center py-20 text-gray-400"
-        >
-          <p class="font-bold">No favorites yet.</p>
-          <p class="text-xs">Save guides you find interesting!</p>
-        </div>
-        <div
-          v-for="fav in favorites"
-          :key="fav.id"
-          class="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 flex items-center justify-between cursor-pointer"
-          @click="openSavedGuide(fav)"
-        >
-          <div class="flex-1 pr-4 text-left">
-            <div class="flex items-center justify-between">
-              <h3 class="font-extrabold text-gray-900">{{ fav.name }}</h3>
-              <div class="flex items-center space-x-2 shrink-0">
-                <div
-                  v-if="getFeedback(fav.id).up > 0"
-                  class="flex items-center space-x-1 text-green-600 bg-green-50 px-2 py-0.5 rounded-full"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    stroke="none"
-                  >
-                    <path
-                      d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"
-                    />
-                  </svg>
-                  <span class="text-[9px] font-black">{{
-                    getFeedback(fav.id).up
-                  }}</span>
-                </div>
-                <div
-                  v-if="getFeedback(fav.id).down > 0"
-                  class="flex items-center space-x-1 text-red-600 bg-red-50 px-2 py-0.5 rounded-full"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    stroke="none"
-                  >
-                    <path d="M17 14V2" />
-                    <path
-                      d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"
-                    />
-                  </svg>
-                  <span class="text-[9px] font-black">{{
-                    getFeedback(fav.id).down
-                  }}</span>
-                </div>
-              </div>
-            </div>
-            <p class="text-xs text-gray-500">{{ fav.vicinity }}</p>
-          </div>
-          <button @click.stop="toggleFavorite(fav)" class="text-indigo-600">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              stroke="none"
-            >
-              <path
-                d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
-
     <!-- UI Overlay: Bottom Sheet for Places -->
     <div
       class="absolute bottom-0 left-0 right-0 bg-white shadow-[0_-8px_30px_rgba(0,0,0,0.12)] z-20 h-[100svh] flex flex-col border-t border-gray-100 will-change-transform"
       :class="{
-        'translate-y-full opacity-0': isPlayingGuide || showFavorites,
+        'translate-y-full opacity-0': isPlayingGuide,
         'rounded-t-[2.5rem] overflow-hidden': currentSnapState !== 'full',
         'rounded-t-none': currentSnapState === 'full',
       }"
       :style="
-        !isDragging && !isPlayingGuide && !showFavorites
+        !isDragging && !isPlayingGuide
           ? {
               transform: `translateY(${snapPoints[currentSnapState]}px)`,
               transition: `transform ${snapDuration}ms cubic-bezier(0.34, 1.56, 0.64, 1)`,
-              borderRadius:
-                currentSnapState === 'full' ? '0px' : '2.5rem 2.5rem 0 0',
+              borderRadius: currentSnapState === 'full' ? '0px' : '2.5rem 2.5rem 0 0',
             }
-          : isDragging && !isPlayingGuide && !showFavorites
+          : isDragging && !isPlayingGuide
             ? {
                 transform: `translateY(${dragY}px)`,
                 borderRadius: dragY < 40 ? '0px' : '2.5rem 2.5rem 0 0',
@@ -689,6 +578,7 @@
             : {}
       "
     >
+
       <!-- Draggable Header Section (Handle + Title + Filters) -->
       <div
         class="w-full flex-shrink-0 cursor-grab active:cursor-grabbing touch-none bg-white"
@@ -788,14 +678,28 @@
               v-for="f in categories"
               :key="f.id"
               @click.stop="setCategory(f.id)"
-              class="px-4 py-2 rounded-xl text-[10px] font-black transition-all whitespace-nowrap border uppercase tracking-widest"
+              class="px-4 py-2 rounded-xl text-[10px] font-black transition-all whitespace-nowrap border uppercase tracking-widest flex items-center space-x-1.5"
               :class="
                 currentCategory === f.id
                   ? 'bg-gray-900 text-white border-gray-900'
                   : 'bg-gray-50 text-gray-500 border-gray-100'
               "
             >
-              {{ f.label }}
+              <svg
+                v-if="f.id === 'favorites'"
+                xmlns="http://www.w3.org/2000/svg"
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                stroke="none"
+                class="shrink-0"
+              >
+                <path
+                  d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"
+                />
+              </svg>
+              <span>{{ f.label }}</span>
             </button>
           </div>
         </div>
@@ -1679,7 +1583,6 @@ const userPosition = ref<{ lat: number; lng: number } | null>(null);
 const error = ref<string | null>(null);
 const places = ref<any[]>([]);
 const isFetchingPlaces = ref(false);
-const showFavorites = ref(false);
 const isSheetCollapsed = ref(false); // We'll keep this for the 'peek' state vs 'expanded/full'
 
 // 3-State Draggable Sheet Logic
@@ -1823,6 +1726,7 @@ const categories = [
   { id: "culture", label: "Culture" },
   { id: "nature", label: "Nature" },
   { id: "custom", label: "Custom" },
+  { id: "favorites", label: "Favorites" },
 ];
 
 const mapStyles = [
@@ -2056,23 +1960,33 @@ const filteredPlaces = computed(() => {
   // Combine official places with custom places
   let list = [...places.value, ...customPlaces.value];
 
-  if (currentCategory.value === "custom") {
+  if (currentCategory.value === "favorites") {
+    const favoriteIds = new Set(favorites.value.map((f) => f.id));
+    list = list.filter((p) => favoriteIds.has(p.id));
+  } else if (currentCategory.value === "custom") {
     list = list.filter((p) => p.isCustom);
   } else if (currentCategory.value !== "all") {
     const allowed = categoryTypes[currentCategory.value] || [];
-    list = list.filter(
-      (p) =>
-        p.isCustom || (p.types || []).some((t: string) => allowed.includes(t)),
+    list = list.filter((p) =>
+      (p.types || []).some((t: string) => allowed.includes(t)),
     );
   }
 
-  // Crucial: Filter out any places without valid coordinates to prevent crashes in Google Maps / Clusterer
+  // Crucial: Filter out any places without valid coordinates
   return list.filter(
     (p) =>
       p.location &&
       typeof p.location.lat === "number" &&
       typeof p.location.lng === "number",
   );
+});
+
+// Markers specifically for the map (allows showing only the active one)
+const mapPlaces = computed(() => {
+  if (isPlayingGuide.value && selectedPlace.value) {
+    return [selectedPlace.value];
+  }
+  return filteredPlaces.value;
 });
 
 const currentCategoryLabel = computed(
