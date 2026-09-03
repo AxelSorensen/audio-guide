@@ -20,7 +20,15 @@ cd audio-guide
 pnpm install
 ```
 
-Set your Google Maps and OpenAI API keys as required by `nuxt.config.ts` / `.env`.
+## Configuration
+
+Copy `.env.example` to `.env` and fill in:
+
+- `NUXT_PUBLIC_GOOGLE_MAPS_API_KEY` — Google Maps JavaScript/Places API key, exposed to the client for rendering the map
+- `NUXT_OPENAI_API_KEY` — OpenAI API key, used server-side to generate narration, transcribe audio, and produce text-to-speech
+- `NUXT_TAVILY_API_KEY` — Tavily search API key, used server-side by `/api/generate-guide` to look up background info on nearby places before generating narration
+
+Without these, the map won't load, location search will fail, and the AI narration endpoints will return an error — but the app still builds and starts.
 
 ## Usage
 
