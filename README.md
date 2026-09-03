@@ -1,75 +1,45 @@
-# Nuxt Minimal Starter
+# 🎧 Audio Guide
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+A Nuxt app that turns a Google Map into a location-aware audio guide, using OpenAI to generate narration as you move.
 
-## Setup
+## Features
 
-Make sure to install dependencies:
+- 🗺️ **Interactive map** — built on `vue3-google-map` with marker clustering via `@googlemaps/markerclusterer`
+- 🤖 **AI-generated narration** — uses the `openai` SDK and `@openai/agents` to produce guide content, validated with `zod`
+- 📍 **Location-aware** — reactive map centering as the user's position changes
+- 🎨 **Tailwind styling** — via `@nuxtjs/tailwindcss`
+
+## Installation
 
 ```bash
-# npm
-npm install
-
-# pnpm
+git clone <this repo>
+cd audio-guide
 pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
 ```
 
-## Development Server
+Set your Google Maps and OpenAI API keys as required by `nuxt.config.ts` / `.env`.
 
-Start the development server on `http://localhost:3000`:
+## Usage
 
 ```bash
-# npm
-npm run dev
-
-# pnpm
 pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
 
-## Production
-
-Build the application for production:
+Dev server runs over HTTPS on your local network (`nuxt dev --host --https`) — needed for geolocation to work in the browser.
 
 ```bash
-# npm
-npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
+pnpm build      # production build
+pnpm generate   # static generation
+pnpm preview    # preview production build
 ```
 
-Locally preview production build:
+## Built with
 
-```bash
-# npm
-npm run preview
+- [Nuxt 4](https://nuxt.com/)
+- [Google Maps JavaScript API](https://developers.google.com/maps) via `vue3-google-map`
+- [OpenAI API](https://platform.openai.com/) / Agents SDK
+- [Tailwind CSS](https://tailwindcss.com/)
 
-# pnpm
-pnpm preview
+## Status
 
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+🚧 Active prototype — core map + AI narration pieces are wired up (`app/`, `server/`), but this replaces the project's original default Nuxt-starter README, so expect rough edges around error handling and API key setup.
