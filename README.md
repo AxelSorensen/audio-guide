@@ -43,3 +43,5 @@ pnpm preview    # preview production build
 ## Status
 
 🚧 Active prototype — core map + AI narration pieces are wired up (`app/`, `server/`), but this replaces the project's original default Nuxt-starter README, so expect rough edges around error handling and API key setup.
+
+⚠️ `pnpm install && pnpm run build` verified working as of 2026-09-03. Actual runtime features (map, narration, transcription, TTS) require your own Google Maps and OpenAI API keys in `.env`, which aren't provided here — build/typecheck succeed without them.
