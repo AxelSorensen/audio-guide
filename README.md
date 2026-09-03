@@ -2,6 +2,9 @@
 
 A Nuxt app that turns a Google Map into a location-aware audio guide, using OpenAI to generate narration as you move.
 
+![Audio Guide screenshot](docs/screenshot.png)
+*Headless browser denied the location prompt, so it's stuck on "Acquiring location" — still shows the app UI running.*
+
 ## Features
 
 - 🗺️ **Interactive map** — built on `vue3-google-map` with marker clustering via `@googlemaps/markerclusterer`
